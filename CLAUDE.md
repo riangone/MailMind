@@ -49,7 +49,7 @@ All credentials and settings are injected via environment variables. `manage.sh`
 ### Key data structures in `email_daemon.py`
 
 - **`MAILBOXES`** (line ~29) — dict of mailbox presets keyed by name (`126`, `163`, `qq`, `gmail`, `outlook`), each with IMAP/SMTP servers, ports, auth type, and env var names to read credentials from.
-- **`AI_BACKENDS`** (line ~99) — dict of AI backend presets keyed by name, each with `type` (`cli` or `api`), command/URL, and model.
+- **`AI_BACKENDS`** (line ~99) — dict of AI backend presets keyed by name, each with `type` (`cli` or `api`), command/URL, and model. API types: `api_anthropic`, `api_openai` (also used for DeepSeek), `api_gemini`, `api_qwen`, `api_copilot` (GitHub Copilot).
 
 ### Main loop flow
 

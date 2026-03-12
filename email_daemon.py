@@ -103,10 +103,12 @@ AI_BACKENDS = {
     "codex":       {"type": "cli", "cmd": os.environ.get("CODEX_CMD",  "codex"),  "args": ["exec", "--skip-git-repo-check"]},
     "gemini":      {"type": "cli", "cmd": os.environ.get("GEMINI_CMD", "gemini"), "args": ["-p"]},
     "qwen":        {"type": "cli", "cmd": os.environ.get("QWEN_CMD",   "qwen"),   "args": ["--prompt"]},
-    "anthropic":   {"type": "api_anthropic", "api_key": os.environ.get("ANTHROPIC_API_KEY", ""), "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")},
-    "openai":      {"type": "api_openai",    "api_key": os.environ.get("OPENAI_API_KEY", ""),    "model": os.environ.get("OPENAI_MODEL",     "gpt-4o"),            "url": "https://api.openai.com/v1/chat/completions"},
-    "gemini-api":  {"type": "api_gemini",    "api_key": os.environ.get("GEMINI_API_KEY", ""),    "model": os.environ.get("GEMINI_MODEL",     "gemini-2.0-flash")},
-    "qwen-api":    {"type": "api_qwen",      "api_key": os.environ.get("QWEN_API_KEY", ""),      "model": os.environ.get("QWEN_MODEL",       "qwen-max")},
+    "anthropic":   {"type": "api_anthropic", "api_key": os.environ.get("ANTHROPIC_API_KEY", ""),  "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")},
+    "openai":      {"type": "api_openai",    "api_key": os.environ.get("OPENAI_API_KEY", ""),     "model": os.environ.get("OPENAI_MODEL",     "gpt-4o"),            "url": "https://api.openai.com/v1/chat/completions"},
+    "gemini-api":  {"type": "api_gemini",    "api_key": os.environ.get("GEMINI_API_KEY", ""),     "model": os.environ.get("GEMINI_MODEL",     "gemini-2.0-flash")},
+    "qwen-api":    {"type": "api_qwen",      "api_key": os.environ.get("QWEN_API_KEY", ""),       "model": os.environ.get("QWEN_MODEL",       "qwen-max")},
+    "deepseek":    {"type": "api_openai",    "api_key": os.environ.get("DEEPSEEK_API_KEY", ""),   "model": os.environ.get("DEEPSEEK_MODEL",    "deepseek-chat"),     "url": "https://api.deepseek.com/v1/chat/completions"},
+    "copilot":     {"type": "api_copilot",   "api_key": os.environ.get("GITHUB_COPILOT_TOKEN", ""), "model": os.environ.get("COPILOT_MODEL",  "gpt-4o")},
 }
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
@@ -498,6 +500,23 @@ def call_ai_api_qwen(backend: dict, instruction: str) -> str:
     return resp.json()["output"]["text"].strip()
 
 
+def call_ai_api_copilot(backend: dict, instruction: str) -> str:
+    prompt = PROMPT_TEMPLATE.format(instruction=instruction)
+    resp = requests.post(
+        "https://api.githubcopilot.com/chat/completions",
+        headers={
+            "Authorization": f"Bearer {backend['api_key']}",
+            "Content-Type": "application/json",
+            "Editor-Version": "vscode/1.94.0",
+            "Copilot-Integration-Id": "vscode-chat",
+        },
+        json={"model": backend["model"], "messages": [{"role": "user", "content": prompt}]},
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
 def call_ai(ai_name: str, backend: dict, instruction: str) -> tuple:
     """返回 (subject, body, attachments)"""
     try:
@@ -507,6 +526,7 @@ def call_ai(ai_name: str, backend: dict, instruction: str) -> tuple:
         elif t == "api_openai":    raw = call_ai_api_openai(backend, instruction)
         elif t == "api_gemini":    raw = call_ai_api_gemini(backend, instruction)
         elif t == "api_qwen":      raw = call_ai_api_qwen(backend, instruction)
+        elif t == "api_copilot":   raw = call_ai_api_copilot(backend, instruction)
         else: raise ValueError(f"未知 AI 类型: {t}")
         return parse_ai_response(raw)
     except subprocess.TimeoutExpired:
