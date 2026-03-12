@@ -4,7 +4,7 @@
 #  用法: bash manage.sh [start|stop|restart|status|log|install]
 # ═══════════════════════════════════════════════════════════════
 
-# ─── 配置区（根据实际情况修改）────────────────────────────────
+# ─── 固定路径 ──────────────────────────────────────────────────
 INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
 VENV_PYTHON="$INSTALL_DIR/venv/bin/python3"
 SCRIPT="$INSTALL_DIR/email_daemon.py"
@@ -12,49 +12,18 @@ SERVICE_NAME="email-daemon"
 LOG_FILE="$INSTALL_DIR/daemon.log"
 PID_FILE="$INSTALL_DIR/daemon.pid"
 
-MAILBOX="126"          # 邮箱: 126 / 163 / qq / gmail / outlook
-AI="codex"            # AI:   claude / codex / gemini / anthropic / openai / gemini-api / qwen-api
-POLL_INTERVAL="60"     # 轮询间隔（秒）
-
-# ─── 邮箱环境变量（填写你的真实信息）──────────────────────────
-export MAIL_126_ADDRESS="your@126.com"
-export MAIL_126_PASSWORD="your-auth-code"
-export MAIL_126_ALLOWED="your@126.com"
-
-# export MAIL_163_ADDRESS="your@163.com"
-# export MAIL_163_PASSWORD="your-auth-code"
-# export MAIL_163_ALLOWED="your@163.com"
-
-# export MAIL_QQ_ADDRESS="your@qq.com"
-# export MAIL_QQ_PASSWORD="your-auth-code"
-# export MAIL_QQ_ALLOWED="your@qq.com"
-
-# Gmail OAuth（推荐）：
-#   1. 在 Google Cloud Console 创建项目并启用 Gmail API
-#   2. 创建 OAuth 凭据（桌面应用），下载为 credentials_gmail.json 放到本目录
-#   3. 首次运行: python3 email_daemon.py --mailbox gmail --auth  （按提示授权）
-# export MAIL_GMAIL_ADDRESS="your@gmail.com"
-# export MAIL_GMAIL_ALLOWED="your@gmail.com"
-# Gmail 应用专用密码（简单方式，需关闭两步验证或生成应用密码）：
-#   修改 email_daemon.py 中 gmail 的 "auth": "password"，再填写下面两行
-# export MAIL_GMAIL_ADDRESS="your@gmail.com"
-# export MAIL_GMAIL_PASSWORD="xxxx xxxx xxxx xxxx"
-# export MAIL_GMAIL_ALLOWED="your@gmail.com"
-
-# Outlook OAuth：
-#   1. 在 Azure Portal 注册应用，获取 Client ID
-#   2. 首次运行: python3 email_daemon.py --mailbox outlook --auth  （设备码授权）
-# export MAIL_OUTLOOK_ADDRESS="your@outlook.com"
-# export OUTLOOK_CLIENT_ID="your-azure-app-client-id"
-# export MAIL_OUTLOOK_ALLOWED="your@outlook.com"
-
-# ─── AI 环境变量（按需填写）────────────────────────────────────
-# export ANTHROPIC_API_KEY="sk-ant-xxx"
-# export OPENAI_API_KEY="sk-xxx"
-# export GEMINI_API_KEY="AIzaxxx"
-# export QWEN_API_KEY="sk-xxx"
-
-export POLL_INTERVAL="$POLL_INTERVAL"
+# ─── 加载本地配置（不提交到 git）──────────────────────────────
+ENV_FILE="$INSTALL_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck source=.env.example
+    source "$ENV_FILE"
+    set +a
+else
+    echo -e "\033[0;31m[ERROR]\033[0m 找不到配置文件: $ENV_FILE"
+    echo "       请复制模板并填写真实信息: cp .env.example .env"
+    exit 1
+fi
 
 # ═══════════════════════════════════════════════════════════════
 
