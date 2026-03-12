@@ -98,16 +98,17 @@ MAILBOXES = {
 #  AI 配置
 # ═══════════════════════════════════════════════════════════════
 
-def _copilot_token_from_config() -> str:
-    """从 ~/.copilot/config.json 自动读取 GitHub Copilot token"""
-    config_path = os.path.expanduser("~/.copilot/config.json")
-    try:
-        with open(config_path) as f:
-            data = json.load(f)
-        tokens = data.get("copilot_tokens", {})
-        return next(iter(tokens.values()), "") if tokens else ""
-    except Exception:
-        return ""
+def _copilot_cmd() -> str:
+    """查找 GitHub Copilot CLI 可执行文件路径"""
+    env_cmd = os.environ.get("COPILOT_CMD", "")
+    if env_cmd:
+        return env_cmd
+    bundled = os.path.expanduser(
+        "~/.vscode-server/data/User/globalStorage/github.copilot-chat/copilotCli/copilot"
+    )
+    if os.path.isfile(bundled):
+        return bundled
+    return "copilot"
 
 
 AI_BACKENDS = {
@@ -120,7 +121,7 @@ AI_BACKENDS = {
     "gemini-api":  {"type": "api_gemini",    "api_key": os.environ.get("GEMINI_API_KEY", ""),     "model": os.environ.get("GEMINI_MODEL",     "gemini-2.0-flash")},
     "qwen-api":    {"type": "api_qwen",      "api_key": os.environ.get("QWEN_API_KEY", ""),       "model": os.environ.get("QWEN_MODEL",       "qwen-max")},
     "deepseek":    {"type": "api_openai",    "api_key": os.environ.get("DEEPSEEK_API_KEY", ""),   "model": os.environ.get("DEEPSEEK_MODEL",    "deepseek-chat"),     "url": "https://api.deepseek.com/v1/chat/completions"},
-    "copilot":     {"type": "api_copilot",   "api_key": os.environ.get("GITHUB_COPILOT_TOKEN", _copilot_token_from_config()), "model": os.environ.get("COPILOT_MODEL",  "gpt-4o")},
+    "copilot":     {"type": "cli_copilot",   "cmd": _copilot_cmd()},
 }
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
@@ -512,40 +513,20 @@ def call_ai_api_qwen(backend: dict, instruction: str) -> str:
     return resp.json()["output"]["text"].strip()
 
 
-def call_ai_api_copilot(backend: dict, instruction: str) -> str:
-    # Step 1: exchange GitHub token for short-lived Copilot session token
-    token_resp = requests.get(
-        "https://api.github.com/copilot_internal/v2/token",
-        headers={
-            "Authorization": f"token {backend['api_key']}",
-            "Accept": "application/json",
-            "Editor-Version": "vscode/1.94.0",
-            "Editor-Plugin-Version": "copilot-chat/0.22.4",
-            "User-Agent": "GithubCopilot/1.155.0",
-        },
-        timeout=30,
-    )
-    token_resp.raise_for_status()
-    session_token = token_resp.json()["token"]
-
-    # Step 2: call Copilot chat API with session token
+def call_ai_cli_copilot(backend: dict, instruction: str) -> str:
     prompt = PROMPT_TEMPLATE.format(instruction=instruction)
-    resp = requests.post(
-        "https://api.githubcopilot.com/chat/completions",
-        headers={
-            "Authorization": f"Bearer {session_token}",
-            "Content-Type": "application/json",
-            "Editor-Version": "vscode/1.94.0",
-            "Editor-Plugin-Version": "copilot-chat/0.22.4",
-            "Copilot-Integration-Id": "vscode-chat",
-            "openai-intent": "conversation-panel",
-            "User-Agent": "GithubCopilot/1.155.0",
-        },
-        json={"model": backend["model"], "messages": [{"role": "user", "content": prompt}], "stream": False},
-        timeout=120,
+    result = subprocess.run(
+        [backend["cmd"], "--prompt", prompt],
+        capture_output=True, text=True, timeout=180,
     )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[:300])
+    # Strip trailing usage stats block ("Total usage est: ..." and below)
+    output = result.stdout
+    cutoff = output.find("\nTotal usage est:")
+    if cutoff != -1:
+        output = output[:cutoff]
+    return output.strip()
 
 
 def call_ai(ai_name: str, backend: dict, instruction: str) -> tuple:
@@ -557,7 +538,7 @@ def call_ai(ai_name: str, backend: dict, instruction: str) -> tuple:
         elif t == "api_openai":    raw = call_ai_api_openai(backend, instruction)
         elif t == "api_gemini":    raw = call_ai_api_gemini(backend, instruction)
         elif t == "api_qwen":      raw = call_ai_api_qwen(backend, instruction)
-        elif t == "api_copilot":   raw = call_ai_api_copilot(backend, instruction)
+        elif t == "cli_copilot":   raw = call_ai_cli_copilot(backend, instruction)
         else: raise ValueError(f"未知 AI 类型: {t}")
         return parse_ai_response(raw)
     except subprocess.TimeoutExpired:
