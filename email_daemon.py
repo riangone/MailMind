@@ -101,7 +101,7 @@ MAILBOXES = {
 AI_BACKENDS = {
     "claude":      {"type": "cli", "cmd": os.environ.get("CLAUDE_CMD", "claude"), "args": ["--print"]},
     "codex":       {"type": "cli", "cmd": os.environ.get("CODEX_CMD",  "codex"),  "args": ["exec", "--skip-git-repo-check"]},
-    "gemini":      {"type": "cli", "cmd": os.environ.get("GEMINI_CMD", "gemini"), "args": ["--print"]},
+    "gemini":      {"type": "cli", "cmd": os.environ.get("GEMINI_CMD", "gemini"), "args": ["-p"]},
     "qwen":        {"type": "cli", "cmd": os.environ.get("QWEN_CMD",   "qwen"),   "args": ["--prompt"]},
     "anthropic":   {"type": "api_anthropic", "api_key": os.environ.get("ANTHROPIC_API_KEY", ""), "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")},
     "openai":      {"type": "api_openai",    "api_key": os.environ.get("OPENAI_API_KEY", ""),    "model": os.environ.get("OPENAI_MODEL",     "gpt-4o"),            "url": "https://api.openai.com/v1/chat/completions"},

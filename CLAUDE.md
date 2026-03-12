@@ -11,7 +11,7 @@ MailMind is an email-to-AI bridge daemon. Users send emails with instructions; t
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install requests imapclient     # imapclient required for IMAP IDLE mode
+pip install -r requirements.txt     # installs requests, imapclient
 # Optional for Gmail OAuth:
 pip install google-auth google-auth-oauthlib google-auth-httplib2
 # Optional for Outlook OAuth:
@@ -39,7 +39,7 @@ Receive mode is controlled by `MODE` in `.env` (or `--poll` flag):
 
 Everything lives in two files:
 
-- **`email_daemon.py`** — the core daemon (~620 lines)
+- **`email_daemon.py`** — the core daemon (~720 lines)
 - **`manage.sh`** — wrapper for background process/systemd lifecycle + all configuration
 
 ### Configuration model
@@ -60,12 +60,12 @@ fetch_unread_emails() → process_email() → call_ai() → send_reply()
 - **IMAP IDLE** (default): server pushes notification on new mail; `run_idle()` handles auto-reconnect
 - **Poll mode** (`--poll` / `MODE=poll`): `run_poll()` checks every `POLL_INTERVAL` seconds (default 60)
 - Per-mailbox sender whitelist checked before processing
-- AI response expected as JSON (prompt hardcoded in Chinese, lines ~118–129):
+- AI response expected as JSON (`PROMPT_TEMPLATE` hardcoded in Chinese, line ~120; instructs AI to respond only as JSON):
   ```json
   {"subject": "...", "body": "...", "attachments": [{"filename": "report.md", "content": "..."}]}
   ```
 - `attachments` is optional — only include when the AI needs to return file content
-- Processed email IDs tracked in-memory to prevent duplicate handling
+- Processed email IDs tracked in `processed_ids` (in-memory set) — resets on daemon restart, so previously seen unread emails may be reprocessed after a restart
 
 ### Attachment support
 
@@ -94,8 +94,8 @@ OAuth tokens are cached as `token_<mailbox>.json` (gitignored).
 ## Systemd
 
 ```bash
-bash manage.sh install    # Install and enable service
+bash manage.sh install    # Generate and install service (reads current .env at install time)
 bash manage.sh uninstall  # Remove service
 ```
 
-The template `email-daemon.service` targets user `ubuntu` at `/home/ubuntu/ws/ccmail` — adjust before installing.
+`manage.sh install` dynamically generates the service file using env vars from `.env`. **Caveat:** only `MAIL_126_*` vars are inlined; if using other mailboxes, manually add their `Environment=` lines to the generated service file at `/etc/systemd/system/email-daemon.service`.
