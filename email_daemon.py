@@ -69,14 +69,14 @@ MAILBOXES = {
     },
     "gmail": {
         "address":         os.environ.get("MAIL_GMAIL_ADDRESS", ""),
-        "password":        os.environ.get("MAIL_GMAIL_PASSWORD", ""),   # 应用专用密码（非 OAuth 时使用）
+        "password":        os.environ.get("MAIL_GMAIL_PASSWORD", ""),
         "imap_server":     "imap.gmail.com",
         "imap_port":       993,
         "smtp_server":     "smtp.gmail.com",
         "smtp_port":       465,
         "smtp_ssl":        True,
         "imap_id":         False,
-        "auth":            "oauth_google",   # 改为 "password" 则使用应用专用密码
+        "auth":            "oauth_google",
         "oauth_token_file": os.path.join(os.path.dirname(__file__), "token_gmail.json"),
         "oauth_creds_file": os.path.join(os.path.dirname(__file__), "credentials_gmail.json"),
         "allowed_senders": [s.strip() for s in os.environ.get("MAIL_GMAIL_ALLOWED", "").split(",") if s.strip()],
@@ -91,8 +91,32 @@ MAILBOXES = {
         "imap_id":         False,
         "auth":            "oauth_microsoft",
         "oauth_token_file": os.path.join(os.path.dirname(__file__), "token_outlook.json"),
-        "oauth_client_id":  os.environ.get("OUTLOOK_CLIENT_ID", ""),    # Azure App 注册的 Client ID
+        "oauth_client_id":  os.environ.get("OUTLOOK_CLIENT_ID", ""),
         "allowed_senders": [s.strip() for s in os.environ.get("MAIL_OUTLOOK_ALLOWED", "").split(",") if s.strip()],
+    },
+    "icloud": {
+        "address":         os.environ.get("MAIL_ICLOUD_ADDRESS", ""),
+        "password":        os.environ.get("MAIL_ICLOUD_PASSWORD", ""),  # App-specific password
+        "imap_server":     "imap.mail.me.com",
+        "imap_port":       993,
+        "smtp_server":     "smtp.mail.me.com",
+        "smtp_port":       587,
+        "smtp_ssl":        False,
+        "imap_id":         False,
+        "auth":            "password",
+        "allowed_senders": [s.strip() for s in os.environ.get("MAIL_ICLOUD_ALLOWED", "").split(",") if s.strip()],
+    },
+    "proton": {
+        "address":         os.environ.get("MAIL_PROTON_ADDRESS", ""),
+        "password":        os.environ.get("MAIL_PROTON_PASSWORD", ""),  # Bridge password
+        "imap_server":     "127.0.0.1",
+        "imap_port":       1143,
+        "smtp_server":     "127.0.0.1",
+        "smtp_port":       1025,
+        "smtp_ssl":        False,
+        "imap_id":         False,
+        "auth":            "password",
+        "allowed_senders": [s.strip() for s in os.environ.get("MAIL_PROTON_ALLOWED", "").split(",") if s.strip()],
     },
 }
 
@@ -357,7 +381,7 @@ def is_sender_allowed(sender_email: str, allowed: list) -> bool:
         rule = (entry or "").strip().lower()
         if not rule:
             continue
-        if "@" in rule:
+        if "@" in rule and not rule.startswith("@"):
             if sender_email == rule:
                 return True
         else:
