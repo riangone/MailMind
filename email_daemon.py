@@ -501,16 +501,35 @@ def call_ai_api_qwen(backend: dict, instruction: str) -> str:
 
 
 def call_ai_api_copilot(backend: dict, instruction: str) -> str:
+    # Step 1: exchange GitHub token for short-lived Copilot session token
+    token_resp = requests.get(
+        "https://api.github.com/copilot_internal/v2/token",
+        headers={
+            "Authorization": f"token {backend['api_key']}",
+            "Accept": "application/json",
+            "Editor-Version": "vscode/1.94.0",
+            "Editor-Plugin-Version": "copilot-chat/0.22.4",
+            "User-Agent": "GithubCopilot/1.155.0",
+        },
+        timeout=30,
+    )
+    token_resp.raise_for_status()
+    session_token = token_resp.json()["token"]
+
+    # Step 2: call Copilot chat API with session token
     prompt = PROMPT_TEMPLATE.format(instruction=instruction)
     resp = requests.post(
         "https://api.githubcopilot.com/chat/completions",
         headers={
-            "Authorization": f"Bearer {backend['api_key']}",
+            "Authorization": f"Bearer {session_token}",
             "Content-Type": "application/json",
             "Editor-Version": "vscode/1.94.0",
+            "Editor-Plugin-Version": "copilot-chat/0.22.4",
             "Copilot-Integration-Id": "vscode-chat",
+            "openai-intent": "conversation-panel",
+            "User-Agent": "GithubCopilot/1.155.0",
         },
-        json={"model": backend["model"], "messages": [{"role": "user", "content": prompt}]},
+        json={"model": backend["model"], "messages": [{"role": "user", "content": prompt}], "stream": False},
         timeout=120,
     )
     resp.raise_for_status()
