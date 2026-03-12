@@ -98,6 +98,18 @@ MAILBOXES = {
 #  AI 配置
 # ═══════════════════════════════════════════════════════════════
 
+def _copilot_token_from_config() -> str:
+    """从 ~/.copilot/config.json 自动读取 GitHub Copilot token"""
+    config_path = os.path.expanduser("~/.copilot/config.json")
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        tokens = data.get("copilot_tokens", {})
+        return next(iter(tokens.values()), "") if tokens else ""
+    except Exception:
+        return ""
+
+
 AI_BACKENDS = {
     "claude":      {"type": "cli", "cmd": os.environ.get("CLAUDE_CMD", "claude"), "args": ["--print"]},
     "codex":       {"type": "cli", "cmd": os.environ.get("CODEX_CMD",  "codex"),  "args": ["exec", "--skip-git-repo-check"]},
@@ -108,7 +120,7 @@ AI_BACKENDS = {
     "gemini-api":  {"type": "api_gemini",    "api_key": os.environ.get("GEMINI_API_KEY", ""),     "model": os.environ.get("GEMINI_MODEL",     "gemini-2.0-flash")},
     "qwen-api":    {"type": "api_qwen",      "api_key": os.environ.get("QWEN_API_KEY", ""),       "model": os.environ.get("QWEN_MODEL",       "qwen-max")},
     "deepseek":    {"type": "api_openai",    "api_key": os.environ.get("DEEPSEEK_API_KEY", ""),   "model": os.environ.get("DEEPSEEK_MODEL",    "deepseek-chat"),     "url": "https://api.deepseek.com/v1/chat/completions"},
-    "copilot":     {"type": "api_copilot",   "api_key": os.environ.get("GITHUB_COPILOT_TOKEN", ""), "model": os.environ.get("COPILOT_MODEL",  "gpt-4o")},
+    "copilot":     {"type": "api_copilot",   "api_key": os.environ.get("GITHUB_COPILOT_TOKEN", _copilot_token_from_config()), "model": os.environ.get("COPILOT_MODEL",  "gpt-4o")},
 }
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
