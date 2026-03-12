@@ -20,6 +20,8 @@ import requests
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from email.header import decode_header as _decode_header
 
 # ═══════════════════════════════════════════════════════════════
@@ -121,7 +123,12 @@ PROMPT_TEMPLATE = """\
 {instruction}
 
 请严格按以下 JSON 格式回复，不要输出任何其他内容：
-{{"subject": "根据回复内容拟定的简短邮件标题", "body": "回复正文内容"}}"""
+{{"subject": "根据回复内容拟定的简短邮件标题", "body": "回复正文内容", "attachments": [{{"filename": "文件名.txt", "content": "文件内容"}}]}}
+
+说明：
+- attachments 为可选字段，仅在需要以文件形式返回内容时填写（如整理后的文档、报告等）
+- 若无附件，可省略 attachments 字段或设为空数组
+- 附件内容为纯文本，文件名应包含正确后缀（如 .txt / .md / .csv 等）"""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -271,18 +278,39 @@ def decode_str(s: str) -> str:
     return "".join(result)
 
 
-def get_body(msg) -> str:
+def get_body_and_attachments(msg) -> tuple:
+    """返回 (正文文本, 附件列表)
+    附件格式: [{"filename": str, "content": str|bytes, "is_text": bool}]
+    文本类附件直接解码为字符串，二进制附件保留 bytes。
+    """
+    body = ""
+    attachments = []
+
     if msg.is_multipart():
         for part in msg.walk():
-            if part.get_content_type() == "text/plain":
+            content_type = part.get_content_type()
+            disposition = str(part.get_content_disposition() or "")
+
+            if "attachment" in disposition:
+                filename = decode_str(part.get_filename() or "untitled")
                 payload = part.get_payload(decode=True)
                 if payload:
-                    return payload.decode(part.get_content_charset() or "utf-8", errors="replace").strip()
+                    is_text = content_type.startswith("text/")
+                    if is_text:
+                        charset = part.get_content_charset() or "utf-8"
+                        attachments.append({"filename": filename, "content": payload.decode(charset, errors="replace"), "is_text": True})
+                    else:
+                        attachments.append({"filename": filename, "content": payload, "is_text": False})
+            elif content_type == "text/plain" and not body and "attachment" not in disposition:
+                payload = part.get_payload(decode=True)
+                if payload:
+                    body = payload.decode(part.get_content_charset() or "utf-8", errors="replace").strip()
     else:
         payload = msg.get_payload(decode=True)
         if payload:
-            return payload.decode(msg.get_content_charset() or "utf-8", errors="replace").strip()
-    return ""
+            body = payload.decode(msg.get_content_charset() or "utf-8", errors="replace").strip()
+
+    return body, attachments
 
 
 def imap_login(mailbox: dict) -> imaplib.IMAP4_SSL:
@@ -355,20 +383,22 @@ def fetch_unread_emails(mailbox: dict) -> list:
             log.info(f"跳过非白名单: {sender_email}")
             continue
 
+        body, attachments = get_body_and_attachments(msg)
         emails.append({
-            "id":         mid_str,
-            "from":       sender,
-            "from_email": sender_email,
-            "subject":    decode_str(msg.get("Subject", "(无主题)")),
-            "message_id": msg.get("Message-ID", ""),
-            "body":       get_body(msg),
+            "id":          mid_str,
+            "from":        sender,
+            "from_email":  sender_email,
+            "subject":     decode_str(msg.get("Subject", "(无主题)")),
+            "message_id":  msg.get("Message-ID", ""),
+            "body":        body,
+            "attachments": attachments,
         })
 
     mail.logout()
     return emails
 
 
-def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str = ""):
+def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str = "", attachments: list = None):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     full_body = f"{body}\n\n---\n✉️  由 MailMind AI 自动回复 | {timestamp}"
 
@@ -381,10 +411,22 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
         msg["References"]  = in_reply_to
     msg.attach(MIMEText(full_body, "plain", "utf-8"))
 
+    for att in (attachments or []):
+        filename = att.get("filename", "attachment.txt")
+        content  = att.get("content", "")
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(content)
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment", filename=filename)
+        msg.attach(part)
+
     with smtp_login(mailbox) as server:
         server.sendmail(mailbox["address"], to, msg.as_string())
 
-    log.info(f"✅ 已回复 → {to} | {subject}")
+    att_info = f" | {len(attachments)} 个附件" if attachments else ""
+    log.info(f"✅ 已回复 → {to} | {subject}{att_info}")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -392,14 +434,15 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
 # ═══════════════════════════════════════════════════════════════
 
 def parse_ai_response(raw: str) -> tuple:
+    """返回 (subject, body, attachments)"""
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if match:
         try:
             data = json.loads(match.group())
-            return data.get("subject", ""), data.get("body", raw)
+            return data.get("subject", ""), data.get("body", raw), data.get("attachments", [])
         except json.JSONDecodeError:
             pass
-    return "", raw
+    return "", raw, []
 
 
 def call_ai_cli(backend: dict, instruction: str) -> str:
@@ -456,6 +499,7 @@ def call_ai_api_qwen(backend: dict, instruction: str) -> str:
 
 
 def call_ai(ai_name: str, backend: dict, instruction: str) -> tuple:
+    """返回 (subject, body, attachments)"""
     try:
         t = backend["type"]
         if   t == "cli":           raw = call_ai_cli(backend, instruction)
@@ -466,12 +510,12 @@ def call_ai(ai_name: str, backend: dict, instruction: str) -> tuple:
         else: raise ValueError(f"未知 AI 类型: {t}")
         return parse_ai_response(raw)
     except subprocess.TimeoutExpired:
-        return "", "任务超时（超过3分钟），请拆分为更小的任务。"
+        return "", "任务超时（超过3分钟），请拆分为更小的任务。", []
     except FileNotFoundError:
-        return "", f"未找到命令 {backend.get('cmd', '')}，请确认已安装。"
+        return "", f"未找到命令 {backend.get('cmd', '')}，请确认已安装。", []
     except Exception as e:
         log.error(f"AI 调用失败: {e}")
-        return "", f"AI 处理出错：{e}"
+        return "", f"AI 处理出错：{e}", []
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -480,10 +524,20 @@ def call_ai(ai_name: str, backend: dict, instruction: str) -> tuple:
 
 def process_email(mailbox: dict, ai_name: str, backend: dict, em: dict):
     log.info(f"📨 收到指令: [{em['subject']}] 来自 {em['from_email']}")
+
+    # 构建指令：正文 + 收到的附件内容
     instruction = f"发件人：{em['from']}\n主题：{em['subject']}\n\n{em['body']}"
+    incoming_attachments = em.get("attachments", [])
+    if incoming_attachments:
+        log.info(f"📎 邮件附带 {len(incoming_attachments)} 个附件")
+        for att in incoming_attachments:
+            if att["is_text"]:
+                instruction += f"\n\n--- 附件：{att['filename']} ---\n{att['content']}"
+            else:
+                instruction += f"\n\n--- 附件（二进制，无法读取内容）：{att['filename']} ---"
 
     log.info(f"🤖 [{ai_name}] 处理中...")
-    new_subject, reply_body = call_ai(ai_name, backend, instruction)
+    new_subject, reply_body, reply_attachments = call_ai(ai_name, backend, instruction)
 
     if new_subject:
         reply_subject = new_subject
@@ -491,8 +545,12 @@ def process_email(mailbox: dict, ai_name: str, backend: dict, em: dict):
     else:
         reply_subject = em["subject"] if em["subject"].startswith("Re:") else f"Re: {em['subject']}"
 
+    if reply_attachments:
+        log.info(f"📎 AI 生成 {len(reply_attachments)} 个附件")
+
     send_reply(mailbox, to=em["from_email"], subject=reply_subject,
-               body=reply_body, in_reply_to=em.get("message_id", ""))
+               body=reply_body, in_reply_to=em.get("message_id", ""),
+               attachments=reply_attachments)
     processed_ids.add(em["id"])
 
 
