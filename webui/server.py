@@ -351,7 +351,12 @@ async def config_mail(request: Request):
     # Map _email_input → correct env var based on MAILBOX type
     email_input = data.get("_email_input", "").strip()
     if email_input and "@" in email_input:
-        mailbox = updates.get("MAILBOX") or env.get("MAILBOX", "custom")
+        mailbox = updates.get("MAILBOX") or env.get("MAILBOX", "")
+        if not mailbox:
+            # Infer mailbox type from domain
+            domain = email_input.split("@", 1)[1].lower()
+            mailbox = DOMAIN_MAP.get(domain, "custom")
+            updates["MAILBOX"] = mailbox
         prefix = MAILBOX_PREFIX.get(mailbox, "MAIL_CUSTOM")
         updates[f"{prefix}_ADDRESS"] = email_input
 
