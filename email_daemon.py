@@ -31,6 +31,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 from email.header import decode_header as _decode_header
 from email.utils import parseaddr
+from typing import Optional
 
 # ═══════════════════════════════════════════════════════════════
 #  邮箱配置
@@ -197,7 +198,7 @@ WEB_SEARCH_PROMPT = """
 """
 
 
-def web_search(query: str, num_results: int = 5, engine: str | None = None) -> list:
+def web_search(query: str, num_results: int = 5, engine: Optional[str] = None) -> list:
     """
     执行网络搜索，返回搜索结果列表
     """
@@ -294,7 +295,7 @@ def fetch_weather(location: str) -> str:
         return f"⚠️ 天气获取失败：{e}"
 
 
-def fetch_news(query: str | None = None, page_size: int | None = None, language: str | None = None, country: str | None = None, sources: str | None = None) -> str:
+def fetch_news(query: Optional[str] = None, page_size: Optional[int] = None, language: Optional[str] = None, country: Optional[str] = None, sources: Optional[str] = None) -> str:
     if not NEWS_API_KEY:
         return "⚠️ 未配置 NEWS_API_KEY，无法获取新闻。"
     q = query or NEWS_DEFAULT_QUERY
@@ -362,7 +363,7 @@ def _read_cpu_times() -> tuple[float, float]:
     return 0.0, 0.0
 
 
-def fetch_system_status(payload: dict | None = None) -> str:
+def fetch_system_status(payload: Optional[dict] = None) -> str:
     payload = payload or {}
     lines = ["# 🖥️ 系统运行状态", ""]
 
@@ -662,7 +663,7 @@ POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 log = logging.getLogger("mailmind")
 processed_ids: set = set()
-PROCESSED_IDS_PATH: str | None = None
+PROCESSED_IDS_PATH: Optional[str] = None
 
 
 def _default_processed_ids_path(mailbox_name: str) -> str:
@@ -757,9 +758,9 @@ class TaskScheduler:
         schedule_every: str = None,
         schedule_until: str = None,
         task_type: str = "email",
-        task_payload: dict | None = None,
-        output: dict | None = None,
-        attachments: list | None = None,
+        task_payload: Optional[dict] = None,
+        output: Optional[dict] = None,
+        attachments: Optional[list] = None,
     ):
         try:
             interval = self._parse_duration(schedule_every)
@@ -1007,7 +1008,7 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
     log.info(f"✅ 已回复 -> {to} | {subject}")
 
 
-def _archive_output(output: dict, subject: str, body: str, attachments: list | None = None):
+def _archive_output(output: dict, subject: str, body: str, attachments: Optional[list] = None):
     if not output or not output.get("archive"):
         return
     archive_dir = output.get("archive_dir", "reports")
