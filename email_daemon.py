@@ -23,6 +23,10 @@ try:
     import markdown
 except ImportError:
     markdown = None
+try:
+    import imapclient as _imapclient
+except ImportError:
+    _imapclient = None
 from html import unescape
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -1343,11 +1347,14 @@ def run_poll(mailbox_name, ai_name, backend):
         time.sleep(interval)
 
 def run_idle(mailbox_name, ai_name, backend):
-    import imapclient
+    if _imapclient is None:
+        log.warning("imapclient 未安装，自动切换为轮询模式（可运行 pip install imapclient 启用 IDLE）")
+        run_poll(mailbox_name, ai_name, backend)
+        return
     mailbox = MAILBOXES[mailbox_name]
     while True:
         try:
-            with imapclient.IMAPClient(mailbox["imap_server"], ssl=True) as client:
+            with _imapclient.IMAPClient(mailbox["imap_server"], ssl=True) as client:
                 if mailbox.get("auth") == "password": client.login(mailbox["address"], mailbox["password"])
                 else: client.oauth2_login(mailbox["address"], get_oauth_token(mailbox))
                 if mailbox.get("imap_id"): client.id_({"name": "mailmind"})
