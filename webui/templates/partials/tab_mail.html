@@ -28,6 +28,7 @@
           当前使用 {{ mail_config.mailbox_type }} 配置
         </div>
         <input type="hidden" name="MAILBOX" value="{{ mail_config.mailbox_type }}">
+        <input type="hidden" name="{{ mail_config.prefix }}_ADDRESS" value="{{ mail_config.address }}">
         {% if mail_config.mailbox_type == "gmail" %}
           <div class="form-group">
             <label>认证方式</label>

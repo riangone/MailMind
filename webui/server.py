@@ -344,9 +344,12 @@ async def config_mail(request: Request):
         if isinstance(value, str):
             updates[key] = value
 
-    # Always write MAILBOX if present
-    if "MAILBOX" not in updates and "MAILBOX" in env:
-        pass  # keep existing
+    # Map _email_input → correct env var based on MAILBOX type
+    email_input = data.get("_email_input", "").strip()
+    if email_input and "@" in email_input:
+        mailbox = updates.get("MAILBOX") or env.get("MAILBOX", "custom")
+        prefix = MAILBOX_PREFIX.get(mailbox, "MAIL_CUSTOM")
+        updates[f"{prefix}_ADDRESS"] = email_input
 
     try:
         write_env(updates)
