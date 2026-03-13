@@ -1,6 +1,7 @@
 # ─── 必须 ──────────────────────────────────────────────────────
 requests>=2.28.0        # AI API 调用（anthropic / openai / gemini / qwen）
 imapclient>=2.3.0       # IMAP IDLE 实时推送模式
+markdown>=3.4.0         # 邮件 Markdown 转 HTML 渲染
 
 # ─── Gmail OAuth（可选，使用 gmail + oauth_google 时需要）───────
 # google-auth>=2.0.0

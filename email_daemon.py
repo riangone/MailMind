@@ -9,6 +9,7 @@ import imaplib
 import smtplib
 import email
 import subprocess
+import shutil
 import time
 import logging
 import os
@@ -18,6 +19,10 @@ import json
 import re
 import requests
 import threading
+try:
+    import markdown
+except ImportError:
+    markdown = None
 from html import unescape
 from datetime import datetime
 from email.mime.text import MIMEText
@@ -309,16 +314,121 @@ def fetch_news(query: str | None = None, page_size: int | None = None, language:
             title = it.get("title", "无标题")
             source = it.get("source", {}).get("name", "")
             url = it.get("url", "")
-            lines.append(f"{i}. {title} ({source})\n   {url}")
+            lines.append(f"{i}. {title} ({source})\n   🔗 链接: {url}")
         return "\n".join(lines)
     except Exception as e:
         return f"⚠️ 新闻获取失败：{e}"
 
 
+def _read_meminfo_kb() -> dict:
+    info = {}
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            for line in f:
+                if ":" not in line:
+                    continue
+                key, rest = line.split(":", 1)
+                val = rest.strip().split()[0]
+                if val.isdigit():
+                    info[key] = int(val)
+    except Exception:
+        pass
+    return info
+
+
+def _read_cpu_times() -> tuple[float, float]:
+    try:
+        with open("/proc/stat", "r", encoding="utf-8") as f:
+            parts = f.readline().strip().split()
+            if parts and parts[0] == "cpu":
+                nums = [float(x) for x in parts[1:]]
+                total = sum(nums)
+                idle = nums[3] + (nums[4] if len(nums) > 4 else 0.0)
+                return total, idle
+    except Exception:
+        pass
+    return 0.0, 0.0
+
+
+def fetch_system_status(payload: dict | None = None) -> str:
+    payload = payload or {}
+    lines = ["# 🖥️ 系统运行状态", ""]
+
+    # Uptime / Load
+    try:
+        with open("/proc/uptime", "r", encoding="utf-8") as f:
+            uptime_seconds = float(f.read().split()[0])
+        uptime_h = int(uptime_seconds // 3600)
+        uptime_m = int((uptime_seconds % 3600) // 60)
+        load1, load5, load15 = os.getloadavg()
+        lines.append(f"- 运行时间：{uptime_h}h {uptime_m}m")
+        lines.append(f"- Load Average：{load1:.2f} / {load5:.2f} / {load15:.2f}")
+    except Exception as e:
+        lines.append(f"- 运行时间/负载：⚠️ 无法获取 ({e})")
+
+    # CPU usage (sampled)
+    try:
+        t1, i1 = _read_cpu_times()
+        time.sleep(0.1)
+        t2, i2 = _read_cpu_times()
+        cpu_usage = 0.0
+        if t2 > t1:
+            cpu_usage = (1.0 - (i2 - i1) / (t2 - t1)) * 100.0
+        lines.append(f"- CPU 使用率：{cpu_usage:.1f}%")
+    except Exception as e:
+        lines.append(f"- CPU 使用率：⚠️ 无法获取 ({e})")
+
+    # Memory / Swap
+    mem = _read_meminfo_kb()
+    if mem:
+        mem_total = mem.get("MemTotal", 0) / 1024
+        mem_avail = mem.get("MemAvailable", 0) / 1024
+        mem_used = max(mem_total - mem_avail, 0)
+        swap_total = mem.get("SwapTotal", 0) / 1024
+        swap_free = mem.get("SwapFree", 0) / 1024
+        swap_used = max(swap_total - swap_free, 0)
+        lines.append(f"- 内存：{mem_used:.0f}MB / {mem_total:.0f}MB（可用 {mem_avail:.0f}MB）")
+        if swap_total > 0:
+            lines.append(f"- Swap：{swap_used:.0f}MB / {swap_total:.0f}MB")
+    else:
+        lines.append("- 内存：⚠️ 无法获取")
+
+    # Disk usage
+    try:
+        du = shutil.disk_usage("/")
+        total_gb = du.total / (1024 ** 3)
+        used_gb = du.used / (1024 ** 3)
+        free_gb = du.free / (1024 ** 3)
+        lines.append(f"- 磁盘 /：{used_gb:.1f}GB / {total_gb:.1f}GB（剩余 {free_gb:.1f}GB）")
+    except Exception as e:
+        lines.append(f"- 磁盘：⚠️ 无法获取 ({e})")
+
+    # Top processes (optional)
+    if payload.get("include_processes", True):
+        try:
+            proc = subprocess.run(
+                ["ps", "-eo", "pid,comm,%cpu,%mem", "--sort=-%cpu"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            rows = [r for r in proc.stdout.strip().splitlines() if r.strip()]
+            top = rows[1:6] if len(rows) > 1 else []
+            if top:
+                lines.append("")
+                lines.append("## Top 进程（CPU）")
+                for r in top:
+                    lines.append(f"- {r}")
+        except Exception as e:
+            lines.append(f"- 进程：⚠️ 无法获取 ({e})")
+
+    return "\n".join(lines).strip()
+
+
 def format_search_results(results: list) -> str:
     lines = []
     for i, r in enumerate(results, 1):
-        lines.append(f"{i}. 【{r.get('title', '无标题')}】\n   {r.get('snippet', '')}\n   链接：{r.get('url', '')}\n")
+        lines.append(f"{i}. 【{r.get('title', '无标题')}】\n   {r.get('snippet', '')}\n   🔗 链接: {r.get('url', '')}\n")
     return "\n".join(lines)
 
 
@@ -459,36 +569,54 @@ def auto_detect_task(instruction: str):
     payload = {}
     output = {}
 
-    if any(k in low for k in ["天气", "weather", "天気", "날씨"]):
-        task_type = "weather"
-        m = re.search(r"(?:天气|weather|天気|날씨)[：: ]?([^\n，,;；]+)", instruction, re.I)
-        if m:
-            payload["location"] = m.group(1).strip()
-    if any(k in low for k in ["新闻", "news", "ニュース", "뉴스"]):
-        task_type = "news"
-        m = re.search(r"(?:新闻|news|ニュース|뉴스)[：: ]?([^\n，,;；]+)", instruction, re.I)
-        if m:
-            payload["query"] = m.group(1).strip()
-    if any(k in low for k in ["检索", "搜索", "网页", "search", "look up", "find", "検索", "검색"]):
-        task_type = "web_search"
-        m = re.search(r"(?:检索|搜索|网页检索|search|look up|find|検索|검색)[：: ]?([^\n]+)", instruction, re.I)
-        if m:
-            payload["query"] = m.group(1).strip()
-    if any(k in low for k in ["日报", "周报", "月报", "report", "summary", "レポート", "보고서", "리포트"]):
-        task_type = "report"
+    # 优先检测系统状态关键词
+    sys_keywords = ["系统", "os", "系统运行状态", "系统状态", "运行状态", "资源使用", "cpu", "内存", "磁盘", "进程", "sysinfo", "system status"]
+    if any(k in low for k in sys_keywords):
+        task_type = "system_status"
+        if any(k in low for k in ["进程", "process"]):
+            payload["include_processes"] = True
+    
+    # 仅当未识别为系统状态时，才检测其他类型
+    if not task_type:
         if any(k in low for k in ["天气", "weather", "天気", "날씨"]):
-            payload["weather_locations"] = [WEATHER_DEFAULT_LOCATION]
-        if any(k in low for k in ["新闻", "news", "ニュース", "뉴스"]):
-            payload["news_query"] = NEWS_DEFAULT_QUERY
-        m = re.search(r"(?:检索|搜索|网页检索|search|検索|검색)[：: ]?([^\n，,;；]+)", instruction, re.I)
-        if m:
-            payload["web_query"] = m.group(1).strip()
+            task_type = "weather"
+            m = re.search(r"(?:天气|weather|天気|날씨)[：: ]?([^\n，,;；]+)", instruction, re.I)
+            if m:
+                payload["location"] = m.group(1).strip()
+        elif any(k in low for k in ["新闻", "news", "ニュース", "뉴스"]):
+            task_type = "news"
+            m = re.search(r"(?:新闻|news|ニュース|뉴스)[：: ]?([^\n，,;；]+)", instruction, re.I)
+            if m:
+                payload["query"] = m.group(1).strip()
+        elif any(k in low for k in ["检索", "搜索", "网页", "search", "look up", "find", "検索", "검색"]):
+            task_type = "web_search"
+            m = re.search(r"(?:检索|搜索|网页检索|search|look up|find|検索|검색)[：: ]?([^\n]+)", instruction, re.I)
+            if m:
+                payload["query"] = m.group(1).strip()
+    
+    # 检测日报关键词
+    if any(k in low for k in ["日报", "周报", "月报", "report", "summary", "レポート", "보고서", "리포트"]):
+        # 如果已经识别为 system_status 且又提到了报告，则作为带系统状态的报告
+        if task_type == "system_status":
+            task_type = "report"
+            payload["include_system_status"] = True
+        elif not task_type:
+            task_type = "report"
+            # 默认日报内容，仅在提到时开启，或者根据需要设置
+            if any(k in low for k in sys_keywords):
+                payload["include_system_status"] = True
+            if any(k in low for k in ["天气", "weather", "天気", "날씨"]):
+                payload["weather_locations"] = [WEATHER_DEFAULT_LOCATION]
+            if any(k in low for k in ["新闻", "news", "ニュース", "뉴스"]):
+                payload["news_query"] = NEWS_DEFAULT_QUERY
+
     if any(k in low for k in ["ai", "分析", "总结", "润色", "翻译", "生成", "分析", "要約", "翻訳", "生成", "분석", "요약", "번역", "생성"]):
         if not task_type:
             task_type = "ai_job"
         payload.setdefault("prompt", instruction.strip())
 
     if any(k in low for k in ["归档", "archive", "保存", "save", "保存", "アーカイブ", "저장", "아카이브"]):
+
         output["archive"] = True
         output["archive_dir"] = "reports"
     if any(k in low for k in ["仅归档", "no email", "不要发邮件", "メール不要", "메일 보내지", "이메일 필요없음"]):
@@ -703,12 +831,14 @@ PROMPT_TEMPLATE = """\
   "schedule_every": "可选：重复间隔(秒或5m/2h)",
   "schedule_until": "可选：截止时间(ISO格式)",
   "attachments": [{{"filename": "文件名.txt", "content": "文件内容"}}],
-  "task_type": "可选：email|ai_job|weather|news|web_search|report",
+  "task_type": "可选：email|ai_job|weather|news|web_search|report|system_status",
   "task_payload": {{"可选": "任务参数，如 location/query/prompt 等"}},
   "output": {{"email": true, "archive": true, "archive_dir": "reports"}}
 }}
 
 说明：
+- 当用户要求获取“OS状态”、“CPU使用率”、“内存使用情况”或“磁盘空间”等系统信息时，请务必设置 task_type="system_status"。
+- 只有当用户明确要求“日报”、“总结报告”或“综合信息”时，才使用 task_type="report"。
 - schedule_at: 仅当用户要求定时提醒/发送时使用（例如 "2026-03-13T10:00:00" 或 "3600" 表示1小时后）。若即时回复则省略。
 - schedule_every: 当用户要求“每 X 分钟/小时”等重复提醒时填写（例如 "5m"、"300"）。
 - schedule_until: 重复提醒的截止时间（例如 "2026-03-13T18:00:00"），与 schedule_every 配合使用。
@@ -816,18 +946,52 @@ def smtp_login(mailbox: dict):
     return server
 
 def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str = "", attachments: list = None):
-    full_body = f"{body}\n\n---\n✉️  由 MailMind AI 自动回复 | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    msg = MIMEMultipart()
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    footer_plain = f"\n\n---\n✉️  由 MailMind AI 自动回复 | {ts}"
+    footer_html = f'<br><hr><p style="color: #666; font-size: 12px;">✉️  由 MailMind AI 自动回复 | {ts}</p>'
+    
+    full_body_plain = body + footer_plain
+    
+    msg = MIMEMultipart("mixed")
     msg["From"], msg["To"], msg["Subject"] = mailbox["address"], to, subject
     if in_reply_to: msg["In-Reply-To"] = msg["References"] = in_reply_to
-    msg.attach(MIMEText(full_body, "plain", "utf-8"))
+    
+    # 构造正文 alternative 部分（包含纯文本和 HTML）
+    alt_part = MIMEMultipart("alternative")
+    alt_part.attach(MIMEText(full_body_plain, "plain", "utf-8"))
+    
+    if markdown:
+        # 将 Markdown 转换为 HTML，支持一些常用的扩展
+        try:
+            html_content = markdown.markdown(body, extensions=['extra', 'codehilite', 'nl2br'])
+            full_body_html = f"""<html><head><style>
+                body {{ font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; }}
+                pre {{ background-color: #f6f8fa; padding: 10px; border-radius: 5px; overflow-x: auto; }}
+                code {{ font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace; background-color: rgba(27,31,35,0.05); padding: 0.2em 0.4em; border-radius: 3px; }}
+                blockquote {{ border-left: 4px solid #dfe2e5; color: #6a737d; padding-left: 1em; margin-left: 0; }}
+                table {{ border-collapse: collapse; width: 100%; }}
+                table, th, td {{ border: 1px solid #dfe2e5; }}
+                th, td {{ padding: 6px 13px; }}
+                tr:nth-child(even) {{ background-color: #f6f8fa; }}
+            </style></head><body>
+            {html_content}
+            {footer_html}
+            </body></html>"""
+            alt_part.attach(MIMEText(full_body_html, "html", "utf-8"))
+        except Exception as e:
+            log.warning(f"Markdown 转换失败: {e}")
+            
+    msg.attach(alt_part)
+    
     for att in (attachments or []):
         part = MIMEBase("application", "octet-stream")
         part.set_payload(att["content"].encode("utf-8") if isinstance(att["content"], str) else att["content"])
         encoders.encode_base64(part)
         part.add_header("Content-Disposition", "attachment", filename=att.get("filename", "file.txt"))
         msg.attach(part)
-    with smtp_login(mailbox) as s: s.sendmail(mailbox["address"], to, msg.as_string())
+        
+    with smtp_login(mailbox) as s: 
+        s.sendmail(mailbox["address"], to, msg.as_string())
     log.info(f"✅ 已回复 -> {to} | {subject}")
 
 
@@ -886,7 +1050,26 @@ def parse_ai_response(raw: str):
 def call_ai_text(ai_name: str, backend: dict, prompt: str) -> str:
     try:
         if backend["type"] == "cli":
-            return subprocess.run([backend["cmd"]] + backend["args"] + [prompt], capture_output=True, text=True, timeout=180).stdout.strip()
+            env = os.environ.copy()
+            # 针对 qwen 注入搜索相关的环境变量
+            if ai_name == "qwen":
+                tavily_key = os.environ.get("TAVILY_API_KEY", "")
+                if tavily_key:
+                    env["TAVILY_API_KEY"] = tavily_key
+                google_key = os.environ.get("GOOGLE_API_KEY", "")
+                if google_key:
+                    env["GOOGLE_API_KEY"] = google_key
+                google_id = os.environ.get("GOOGLE_SEARCH_ENGINE_ID", "")
+                if google_id:
+                    env["GOOGLE_SEARCH_ENGINE_ID"] = google_id
+            
+            return subprocess.run(
+                [backend["cmd"]] + backend["args"] + [prompt],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                env=env
+            ).stdout.strip()
         elif backend["type"].startswith("api_"):
             # 简化版：这里假设原有的 API 调用逻辑已在 email_daemon.py 中（实际开发时应保留原有各 API 函数）
             # 为了简洁，此处仅示意逻辑结构
@@ -914,23 +1097,40 @@ def _pick_task_ai(task_payload: dict):
 
 def _compose_report_sections(payload: dict) -> str:
     sections = []
+    
+    # 天气板块：仅当配置了 Key 且有位置时才添加
     locations = payload.get("weather_locations") or []
     if isinstance(locations, str): locations = [locations]
-    if locations:
+    if WEATHER_API_KEY and locations:
         weather_lines = [fetch_weather(loc) for loc in locations]
         sections.append("【天气】\n" + "\n".join(weather_lines))
-    if payload.get("news_query", True):
-        news_text = fetch_news(
-            query=payload.get("news_query"),
-            page_size=payload.get("news_page_size"),
-            language=payload.get("news_language"),
-            country=payload.get("news_country"),
-            sources=payload.get("news_sources"),
-        )
-        sections.append("【新闻】\n" + news_text)
+    
+    # 新闻板块：仅当配置了 Key 时添加
+    news_query = payload.get("news_query")
+    if NEWS_API_KEY:
+        if news_query is True:
+            news_query = NEWS_DEFAULT_QUERY
+        if isinstance(news_query, str) and news_query.strip():
+            news_text = fetch_news(
+                query=news_query,
+                page_size=payload.get("news_page_size"),
+                language=payload.get("news_language"),
+                country=payload.get("news_country"),
+                sources=payload.get("news_sources"),
+            )
+            if news_text and "⚠️" not in news_text:
+                sections.append("【新闻】\n" + news_text)
+    
+    # 网页检索板块
     if payload.get("web_query"):
         results = web_search(payload.get("web_query"), payload.get("web_count", 5), payload.get("web_engine"))
-        sections.append("【网页检索】\n" + (format_search_results(results) if results else "没有找到结果。"))
+        if results:
+            sections.append("【网页检索】\n" + format_search_results(results))
+            
+    # 系统运行状态板块
+    if payload.get("include_system_status"):
+        sections.append("【系统运行状态】\n" + fetch_system_status(payload))
+        
     return "\n\n".join(sections).strip()
 
 
@@ -949,22 +1149,40 @@ def execute_task(task: dict):
         pass
     elif task_type == "weather":
         location = payload.get("location") or WEATHER_DEFAULT_LOCATION
-        body = fetch_weather(location)
+        if WEATHER_API_KEY:
+            body = fetch_weather(location)
+        else:
+            # Fallback: 天气 Key 缺失时，转由 AI 查询
+            log.info("ℹ️ WEATHER_API_KEY 缺失，回退至 AI 任务")
+            ai_name, backend = _pick_task_ai(payload)
+            prompt = f"请搜索并告诉我现在 {location} 的天气情况，包括温度和天气现象。"
+            body = call_ai_text(ai_name, backend, prompt)
         subject = subject or f"天气更新：{location}"
     elif task_type == "news":
-        body = fetch_news(
-            query=payload.get("query"),
-            page_size=payload.get("page_size"),
-            language=payload.get("language"),
-            country=payload.get("country"),
-            sources=payload.get("sources"),
-        )
+        if NEWS_API_KEY:
+            body = fetch_news(
+                query=payload.get("query"),
+                page_size=payload.get("page_size"),
+                language=payload.get("language"),
+                country=payload.get("country"),
+                sources=payload.get("sources"),
+            )
+        else:
+            # Fallback: 如果没有 NewsAPI Key，转为 AI 任务（利用 Qwen 等的原生搜索）
+            log.info("ℹ️ NEWS_API_KEY 缺失，回退至 AI 任务")
+            ai_name, backend = _pick_task_ai(payload)
+            q = payload.get("query") or body or "最新的新闻"
+            prompt = f"请搜索并总结关于以下主题的最新新闻：{q}。重要提示：必须在回复中包含每条新闻的原始链接（URL），不要删减链接信息。"
+            body = call_ai_text(ai_name, backend, prompt)
         subject = subject or "新闻汇总"
     elif task_type == "web_search":
         query = payload.get("query") or ""
         results = web_search(query, payload.get("count", 5), payload.get("engine"))
         body = format_search_results(results) if results else "没有找到结果。"
         subject = subject or f"网页检索：{query}"
+    elif task_type == "system_status":
+        body = fetch_system_status(payload)
+        subject = subject or "OS 系统运行状态"
     elif task_type == "ai_job":
         ai_name, backend = _pick_task_ai(payload)
         prompt = payload.get("prompt") or body
@@ -974,7 +1192,7 @@ def execute_task(task: dict):
         report_text = _compose_report_sections(payload)
         if payload.get("use_ai_summary", True):
             ai_name, backend = _pick_task_ai(payload)
-            prompt = f"请将以下内容汇总成简洁日报，分点输出，重点突出：\n\n{report_text}"
+            prompt = f"请将以下内容汇总成简洁日报，分点输出，重点突出。⚠️ 核心要求：必须完整保留并显示所有新闻和网页检索结果中的原始链接（URL），严禁删减链接信息！\n\n内容如下：\n{report_text}"
             summary = call_ai_text(ai_name, backend, prompt).strip()
             body = summary or report_text
             subject = subject or f"日报 ({ai_name})"
@@ -985,7 +1203,14 @@ def execute_task(task: dict):
         body = f"⚠️ 未知任务类型：{task_type}"
 
     if should_email:
-        send_reply(MAILBOXES[task["mailbox_name"]], task["to"], subject, body, attachments=attachments)
+        send_reply(
+            MAILBOXES[task["mailbox_name"]],
+            task["to"],
+            subject,
+            body,
+            in_reply_to=task.get("in_reply_to", ""),
+            attachments=attachments
+        )
     if should_archive:
         _archive_output(output, subject, body, attachments)
 
@@ -999,8 +1224,11 @@ def process_email(mailbox_name, ai_name, backend, em):
     for att in em.get("attachments", []):
         if att["is_text"]: instr += f"\n\n--- 附件：{att['filename']} ---\n{att['content']}"
     
-    search_res = search_web_if_needed(instr)
-    if search_res: instr = search_res + "\n\n" + instr
+    # 如果是 Qwen 且启用了搜索，可以让 Qwen 自己处理原生搜索 (利用 Tavily/DashScope 等)
+    # 此时跳过 MailMind 的预置搜索，避免逻辑重叠
+    if ai_name != "qwen":
+        search_res = search_web_if_needed(instr)
+        if search_res: instr = search_res + "\n\n" + instr
     
     sub, body, sch_at, sch_every, sch_until, atts, task_type, task_payload, output = call_ai(ai_name, backend, instr)
     detected_tasks = []
@@ -1041,6 +1269,21 @@ def process_email(mailbox_name, ai_name, backend, em):
             )
         else:
             send_reply(MAILBOXES[mailbox_name], em["from_email"], f"已安排定时任务：{sub}", f"您的任务已安排在 {sch_at} 左右执行。\n\n内容预览：\n{body}")
+    elif task_type and task_type != "email":
+        # 即时执行工具任务 (如立即查询天气、系统状态等)
+        log.info(f"⚡ 立即执行工具任务: {task_type}")
+        instant_task = {
+            "mailbox_name": mailbox_name,
+            "to": em["from_email"],
+            "subject": sub,
+            "body": body,
+            "type": task_type,
+            "payload": task_payload or {},
+            "output": output or {"email": True},
+            "attachments": atts,
+            "in_reply_to": em.get("message_id")
+        }
+        execute_task(instant_task)
     elif detected_tasks:
         summaries = []
         for idx, det in enumerate(detected_tasks, 1):

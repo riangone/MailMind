@@ -1,0 +1,20 @@
+任务确认：今天东京主要新闻获取
+
+我将为您搜索并总结今日东京的最新新闻，并确保包含原始链接。
+以下是关于今日（2026年3月13日）东京的主要新闻总结：
+
+### **1. 政治与经济：122.3万亿日元预算案冲刺**
+*   **内容：** 日本政府拟定的122.3万亿日元（约7680亿美元）2026财年预算案预计最快于今晚在众议院通过。首相高市早苗正在推动其尽快获批，以确保在3月31日财年结束前通过国会审议。
+*   **原始链接：** [Japan Times - Fiscal 2026 Budget](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHORMZ3mIrRBluAYnSZ4XFSxI-TnCRNtj4cIzq99u-DDBzirAbpWVMrWpuCauBfDlEyEQQ2gIAyA8AvOtGX-GBx2v9PWzA-CoCKs6H4ODnR3wa62-0Thz_2Sad5zOjnoHQAFeDL2S1al409R8S28McXi4GL9xXXFWYNxmUr2zOwKJnI1sEDkRFp6Q==) | [nippon.com](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFizae_tzDeXFXFcRFrl8Y5C9GcPYL0gJUtM5IFKz_OVG1IZOj2r3pqWks2mcyVjsly_hEVRMgF6aKEOtsYEp29zua2H1yiJDvz9uMTxdA8UnWGXKsa_jczL3qjTnN8l3l36mHJYvEnfFCT)
+
+### **2. 金融市场：日元汇率波动与股市下跌**
+*   **内容：** 受中东局势紧张导致原油价格上涨（突破100美元/桶）影响，美元兑日元汇率今日攀升至159日元上方，创下2024年7月以来新高。财务大臣片山皋月表示政府已准备好采取一切措施应对波动。同时，日经225指数今日下跌1.2%，收于53,819.61点。
+*   **原始链接：** [news.cn - Yen & Oil Volatility](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGfRIQLYVgJJjXrwk6Khg9KYCfXJXUQgiUeUqoBXOgFu4jVYI1lVLhobYpe0gyuAtv4ciNsV7-N4yU1EpoWj3UfWth5EOKNmg2jxAmmxUWZrVHYpBKAYSowHup7ffQL4NzntruBIZiWqDaqMzZ43DJNSAWnpFsLsUQL7hOZpv9KwToJgPDLnata3eS2164d) | [newstimes.com](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEK8yS8LpdLboKVsTUlAnnpeCb_HKoYZK6vag-7fuYWwZdjyh_0lfsrtOGeu3FwBcOfv8Cm_A1jE8vu-MjAC0wR4peiW4EED5HTmlI7zozSSYrbv00Z53hm9dpTAQM-1vHnugNCHcrjYO7j4biyGUgn2VEuCxCUy-ySoCtHFzUcaFnZtXebiMDbbYX4f4LEPf77jrQVNBSDkaqEekpLbuzBbPc=)
+
+### **3. 安全与外交：东京论坛与日捷税收协定**
+*   **内容：** 防卫大臣小泉进次郎在今日的“东京论坛”上发表讲话，强调需加强防御能力以应对日益增长的威胁，并呼吁加强与欧洲及大西洋地区的联系。此外，日本与捷克共和国就新的税收协定达成原则性协议，旨在促进双向投资并防止逃税。
+*   **原始链接：** [Japan Forward - Tokyo Forum](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG8ABgKzmzEV2UazTcGPRlwH2DWF0t9ck84xnPU9vxVuCBCwFFt0eisLvrEYalliTSqSBGbkgVhGDON_5IagRapFiXOe6uAIGGoIwEbVU-6W1_-cvK0XFt7Heg6EtOwFSDgK4H1mP5MGOGxzmBiKiuO0ky-76vMHf7HqArrjRV0EsMNa0iMqDRKWJkGskw=) | [MOFA - Japan-Czech Tax Treaty](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFCKXXPqpD4eD5A1rwVLitoPSwgofCutPMThlpubDU3xLbOckPIc93q4smEJv7nOiQ7kT5CV5YotujU6MVruTT1DOYZQXuc_5O3IqfzIvPlv-P_qFMj9b4tviCSXdtEct4JUF4CThGD1Yn5f79B7M1ZK4X8S3aMjVmw)
+
+### **4. 社会新闻：水户市发生严重火车相撞事故**
+*   **内容：** 今日上午，一列特快列车在东京以东的水户市一处平交道口与一辆轿车相撞，导致轿车司机（一名老年男性）身亡。受此影响，JR常磐线部分路段一度停运，已于下午恢复。
+*   **原始链接：** [news.cn - Train Accident](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFh4mKkpOLePK8xQBMpdAkmXVW-D0e8ApRt6ocyHsnU266lUPuYOHfcm5XQqlwEmtATTbTir-4P1VyLaGvX89kop1-nZ4x0x_QBKED1v_bA_OOJbmElDyDR1-6fO2_w3j661DUDz9rnKejpxFngHh22iHxjHMZ9VepKn5-IVw2UK0HW_hPlM0i6NiaYICAt)

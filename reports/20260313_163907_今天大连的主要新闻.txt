@@ -1,0 +1,22 @@
+今天大连的主要新闻
+
+抱歉，web_search 权限被拒绝了，我无法直接获取实时新闻。
+
+不过，MailMind 项目本身支持通过 AI 后端调用外部 API 来获取新闻。您可以：
+
+**方案 1：使用 MailMind 的邮件指令**
+如果您已配置好 MailMind，可以发送邮件到守护进程，AI 会自动调用新闻 API 并回复结果。
+
+**方案 2：手动配置新闻 API**
+在 `.env` 中配置 NewsAPI 或其他新闻源：
+```bash
+export NEWS_API_KEY="your_newsapi_key"
+```
+
+**方案 3：使用项目内置的 DuckDuckGo 搜索**
+MailMind 默认支持 DuckDuckGo 搜索（无需 API Key），可以通过邮件指令触发。
+
+您想让我帮您：
+1. 检查当前的 `.env` 配置状态？
+2. 查看 `email_daemon.py` 中新闻获取的实现逻辑？
+3. 或者您有其他需求？

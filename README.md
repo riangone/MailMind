@@ -49,7 +49,7 @@ AI="claude"     # 使用的 AI
 
 ### ⏰ 定时任务与外部数据（默认方案）
 
-新增任务类型支持：`email` / `ai_job` / `weather` / `news` / `web_search` / `report`。  
+新增任务类型支持：`email` / `ai_job` / `weather` / `news` / `web_search` / `report` / `system_status`。  
 当指令包含定时（`schedule_at`/`schedule_every`）且设置 `task_type` 时，任务会按类型执行并可归档到 `reports/`。
 
 **默认所需环境变量：**
@@ -103,6 +103,12 @@ export NEWS_DEFAULT_PAGE_SIZE="8"
 每周一 10:00 AI 分析：整理上周项目进度并生成下周计划，归档
 ```
 
+**6) 每 10 分钟系统运行状态**
+
+```
+每10分钟 提供 OS 系统运行状态信息（CPU/内存/磁盘/进程）
+```
+
 ### ⚙️ 自动识别说明
 
 当用户未显式给出 `task_type` 时，系统会根据关键词自动判断任务类型与定时参数：
@@ -111,6 +117,7 @@ export NEWS_DEFAULT_PAGE_SIZE="8"
 - `检索` / `搜索` / `网页` / `search` → `web_search`
 - `日报` / `周报` / `月报` / `report` → `report`
 - `AI` / `分析` / `总结` / `翻译` / `生成` → `ai_job`
+- `系统` / `OS` / `运行状态` / `CPU` / `内存` / `磁盘` / `进程` → `system_status`
 - 包含 `归档` / `archive` / `保存` → 自动启用归档
 - 包含 `不要发邮件` / `no email` / `仅归档` → 关闭邮件发送
 
@@ -343,7 +350,7 @@ python3 email_daemon.py --mailbox outlook --auth
 
 ### ⏰ 定期タスク（デフォルト）
 
-対応タスク：`email` / `ai_job` / `weather` / `news` / `web_search` / `report`  
+対応タスク：`email` / `ai_job` / `weather` / `news` / `web_search` / `report` / `system_status`  
 定時実行の結果はメール送信＋`reports/` にアーカイブ可能。
 
 **環境変数（デフォルト）**
@@ -515,7 +522,7 @@ The terminal shows a **short code** and a URL → Open https://microsoft.com/dev
 
 ### ⏰ Scheduled Tasks (Default)
 
-Supported types: `email` / `ai_job` / `weather` / `news` / `web_search` / `report`  
+Supported types: `email` / `ai_job` / `weather` / `news` / `web_search` / `report` / `system_status`  
 Results can be emailed and archived to `reports/`.
 
 **Env (default)**
@@ -679,7 +686,7 @@ python3 email_daemon.py --mailbox outlook --auth
 
 ### ⏰ 정기 작업（기본）
 
-지원 유형: `email` / `ai_job` / `weather` / `news` / `web_search` / `report`  
+지원 유형: `email` / `ai_job` / `weather` / `news` / `web_search` / `report` / `system_status`  
 결과는 이메일 발송 및 `reports/` 아카이브 가능.
 
 **환경 변수（기본）**

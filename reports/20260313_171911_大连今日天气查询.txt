@@ -1,0 +1,10 @@
+大连今日天气查询
+
+I will search for the current weather in Dalian, including the temperature and weather conditions, to provide you with the most up-to-date information.
+根据搜索结果，截至 2026年3月13日（星期五），大连目前的实时天气情况如下：
+
+*   **温度：** 约 **5°C** (体感温度约 2°C)。
+*   **天气现象：** **多云/阴天** (Cloudy/Overcast)。
+*   **其他指标：** 湿度约为 67% - 80%，北风或西北风，风力约 1-10 英里/小时。
+
+**天气提醒：** 预计今晚可能会有小雨（降水概率约 50%）。
