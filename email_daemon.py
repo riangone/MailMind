@@ -344,15 +344,48 @@ class TaskScheduler:
         except Exception as e:
             log.error(f"保存任务失败: {e}")
 
-    def add_task(self, mailbox_name, to, subject, body, schedule_at: str):
+    def _parse_datetime(self, value: str):
+        if not value: return None
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+
+    def _parse_duration(self, value: str):
+        if not value: return None
+        s = value.strip().lower()
+        if s.isdigit(): return int(s)
+        m = re.fullmatch(r"(\d+)\s*([smhd])", s)
+        if not m: return None
+        num = int(m.group(1))
+        unit = m.group(2)
+        return num * {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit]
+
+    def add_task(self, mailbox_name, to, subject, body, schedule_at: str = None, schedule_every: str = None, schedule_until: str = None):
         try:
-            if schedule_at.isdigit():
-                trigger_time = time.time() + int(schedule_at)
+            interval = self._parse_duration(schedule_every)
+            until_ts = self._parse_datetime(schedule_until)
+
+            if schedule_at:
+                if schedule_at.isdigit():
+                    trigger_time = time.time() + int(schedule_at)
+                else:
+                    trigger_time = self._parse_datetime(schedule_at)
             else:
-                trigger_time = datetime.fromisoformat(schedule_at.replace("Z", "+00:00")).timestamp()
+                trigger_time = time.time()
+
+            if trigger_time is None:
+                raise ValueError("schedule_at 无法解析")
+            if schedule_every and interval is None:
+                raise ValueError("schedule_every 无法解析")
 
             with self.lock:
-                self.tasks.append({"mailbox_name": mailbox_name, "to": to, "subject": subject, "body": body, "trigger_time": trigger_time})
+                self.tasks.append({
+                    "mailbox_name": mailbox_name,
+                    "to": to,
+                    "subject": subject,
+                    "body": body,
+                    "trigger_time": trigger_time,
+                    "interval_seconds": interval,
+                    "until_time": until_ts,
+                })
                 self.save_tasks()
             log.info(f"📅 任务已安排：[{subject}] 将在 {datetime.fromtimestamp(trigger_time)} 发送")
             return True
@@ -377,6 +410,15 @@ class TaskScheduler:
                 try:
                     log.info(f"🔔 执行定时任务：[{t['subject']}] -> {t['to']}")
                     send_reply(MAILBOXES[t["mailbox_name"]], t["to"], t["subject"], t["body"])
+                    interval = t.get("interval_seconds")
+                    if interval:
+                        next_time = time.time() + interval
+                        until_time = t.get("until_time")
+                        if not until_time or next_time <= until_time:
+                            with self.lock:
+                                t["trigger_time"] = next_time
+                                self.tasks.append(t)
+                                self.save_tasks()
                 except Exception as e:
                     log.error(f"执行任务出错: {e}")
             time.sleep(10)
@@ -389,10 +431,12 @@ PROMPT_TEMPLATE = """\
 {instruction}
 
 请严格按以下 JSON 格式回复，不要输出任何其他内容：
-{{"subject": "根据回复内容拟定的简短邮件标题", "body": "回复正文内容", "schedule_at": "可选：触发时间(ISO格式或相对秒数)", "attachments": [{{"filename": "文件名.txt", "content": "文件内容"}}]}}
+{{"subject": "根据回复内容拟定的简短邮件标题", "body": "回复正文内容", "schedule_at": "可选：触发时间(ISO格式或相对秒数)", "schedule_every": "可选：重复间隔(秒或5m/2h)", "schedule_until": "可选：截止时间(ISO格式)", "attachments": [{{"filename": "文件名.txt", "content": "文件内容"}}]}}
 
 说明：
 - schedule_at: 仅当用户要求定时提醒/发送时使用（例如 "2026-03-13T10:00:00" 或 "3600" 表示1小时后）。若即时回复则省略。
+- schedule_every: 当用户要求“每 X 分钟/小时”等重复提醒时填写（例如 "5m"、"300"）。
+- schedule_until: 重复提醒的截止时间（例如 "2026-03-13T18:00:00"），与 schedule_every 配合使用。
 - attachments 为可选字段，附件内容为纯文本。"""
 
 
@@ -533,9 +577,9 @@ def parse_ai_response(raw: str):
     if match:
         try:
             data = json.loads(match.group())
-            return data.get("subject", ""), data.get("body", raw), data.get("schedule_at"), data.get("attachments", [])
+            return data.get("subject", ""), data.get("body", raw), data.get("schedule_at"), data.get("schedule_every"), data.get("schedule_until"), data.get("attachments", [])
         except: pass
-    return "", raw, None, []
+    return "", raw, None, None, None, []
 
 def call_ai(ai_name: str, backend: dict, instruction: str):
     prompt = PROMPT_TEMPLATE.format(instruction=instruction)
@@ -564,12 +608,20 @@ def process_email(mailbox_name, ai_name, backend, em):
     search_res = search_web_if_needed(instr)
     if search_res: instr = search_res + "\n\n" + instr
     
-    sub, body, sch_at, atts = call_ai(ai_name, backend, instr)
+    sub, body, sch_at, sch_every, sch_until, atts = call_ai(ai_name, backend, instr)
     sub = sub or (em["subject"] if em["subject"].startswith("Re:") else f"Re: {em['subject']}")
     
-    if sch_at:
-        scheduler.add_task(mailbox_name, em["from_email"], sub, body, sch_at)
-        send_reply(MAILBOXES[mailbox_name], em["from_email"], f"已安排定时任务：{sub}", f"您的任务已安排在 {sch_at} 左右执行。\n\n内容预览：\n{body}")
+    if sch_at or sch_every:
+        scheduler.add_task(mailbox_name, em["from_email"], sub, body, sch_at, sch_every, sch_until)
+        if sch_every:
+            send_reply(
+                MAILBOXES[mailbox_name],
+                em["from_email"],
+                f"已安排定时任务：{sub}",
+                f"您的任务将每 {sch_every} 发送一次，截止至 {sch_until or '未指定'}。\n\n内容预览：\n{body}",
+            )
+        else:
+            send_reply(MAILBOXES[mailbox_name], em["from_email"], f"已安排定时任务：{sub}", f"您的任务已安排在 {sch_at} 左右执行。\n\n内容预览：\n{body}")
     else:
         send_reply(MAILBOXES[mailbox_name], em["from_email"], sub, body, em.get("message_id"), atts)
     
