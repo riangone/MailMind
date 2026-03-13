@@ -60,12 +60,48 @@ fetch_unread_emails() → process_email() → call_ai() → send_reply()
 - **IMAP IDLE** (default): server pushes notification on new mail; `run_idle()` handles auto-reconnect
 - **Poll mode** (`--poll` / `MODE=poll`): `run_poll()` checks every `POLL_INTERVAL` seconds (default 60)
 - Per-mailbox sender whitelist checked before processing
-- AI response expected as JSON (`PROMPT_TEMPLATE` hardcoded in Chinese, line ~120; instructs AI to respond only as JSON):
+- AI response expected as JSON (`PROMPT_TEMPLATE` hardcoded in Chinese; instructs AI to respond only as JSON):
   ```json
-  {"subject": "...", "body": "...", "attachments": [{"filename": "report.md", "content": "..."}]}
+  {
+    "subject": "...",
+    "body": "...",
+    "schedule_at": "optional ISO or seconds",
+    "schedule_every": "optional interval like 5m/2h",
+    "schedule_until": "optional ISO",
+    "attachments": [{"filename": "report.md", "content": "..."}],
+    "task_type": "email|ai_job|weather|news|web_search|report",
+    "task_payload": {"location": "...", "query": "...", "prompt": "..."},
+    "output": {"email": true, "archive": true, "archive_dir": "reports"}
+  }
   ```
 - `attachments` is optional — only include when the AI needs to return file content
+- If `schedule_at`/`schedule_every` is set, the task is persisted and executed by the scheduler
+- `task_type` controls scheduled task behavior; default is `email`
 - Processed email IDs tracked in `processed_ids` (in-memory set) — resets on daemon restart, so previously seen unread emails may be reprocessed after a restart
+
+### Scheduled tasks
+
+`TaskScheduler` persists tasks in `tasks.json` and executes them in a background thread.
+Supported types: `email`, `ai_job`, `weather`, `news`, `web_search`, `report`.
+
+Outputs:
+- `email`: send result via SMTP
+- `archive`: save to `reports/` (default when scheduled tasks are auto-detected)
+
+### Auto-detect (natural language)
+
+If AI does not specify `task_type`, the daemon auto-detects tasks and schedules them:
+- Keywords: weather/news/search/report/AI
+- Time parsing: `today/tomorrow/tonight/morning/afternoon`, `every X`, `every week`, `YYYY-MM-DD HH:MM`
+- Multi-task: split by `;` or newline into separate scheduled tasks
+
+### External data (default setup)
+
+Environment variables:
+- `WEATHER_API_KEY` (WeatherAPI)
+- `NEWS_API_KEY` (NewsAPI)
+- `BING_API_KEY` (Bing Web Search)
+- `TASK_DEFAULT_AI` (default AI for scheduled jobs)
 
 ### Attachment support
 

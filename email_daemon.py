@@ -337,6 +337,26 @@ def search_web_if_needed(instruction: str) -> str:
     return ""
 
 
+def _parse_time_hhmm(text: str):
+    m = re.search(r"(\d{1,2})[:：](\d{2})", text)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    m = re.search(r"(\d{1,2})\s*点(?:半)?", text)
+    if m:
+        h = int(m.group(1))
+        if "半" in m.group(0):
+            return h, 30
+        return h, 0
+    return None, None
+
+
+def _next_weekday(base: datetime, weekday: int):
+    days_ahead = (weekday - base.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return base + timedelta(days=days_ahead)
+
+
 def _parse_schedule_from_text(text: str):
     low = text.lower()
     schedule_at = None
@@ -353,6 +373,12 @@ def _parse_schedule_from_text(text: str):
     elif rel_day:
         schedule_every = f"{rel_day.group(1)}d"
 
+    if "每天" in text and not schedule_every:
+        schedule_every = "1d"
+
+    if "每周" in text and not schedule_every:
+        schedule_every = "7d"
+
     date_time = re.search(r"(\d{4}-\d{2}-\d{2})(?:\s*[tT ]\s*(\d{1,2}:\d{2}))?", low)
     if date_time:
         d = date_time.group(1)
@@ -362,6 +388,63 @@ def _parse_schedule_from_text(text: str):
     until_match = re.search(r"(?:截止|直到|until)\s*(\d{4}-\d{2}-\d{2}(?:[tT ]\d{1,2}:\d{2})?)", low)
     if until_match:
         schedule_until = until_match.group(1).replace(" ", "T")
+
+    now = datetime.now()
+    if not schedule_at:
+        if any(k in text for k in ["今天", "今日"]):
+            h, m = _parse_time_hhmm(text)
+            if h is not None:
+                dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                if dt <= now:
+                    dt = dt + timedelta(days=1)
+                schedule_at = dt.strftime("%Y-%m-%dT%H:%M:%S")
+        if any(k in text for k in ["明天", "明日"]):
+            h, m = _parse_time_hhmm(text)
+            h = 9 if h is None else h
+            m = 0 if m is None else m
+            dt = (now + timedelta(days=1)).replace(hour=h, minute=m, second=0, microsecond=0)
+            schedule_at = dt.strftime("%Y-%m-%dT%H:%M:%S")
+        if any(k in text for k in ["今晚", "今夜", "晚上"]):
+            h, m = _parse_time_hhmm(text)
+            h = 20 if h is None else h
+            m = 0 if m is None else m
+            dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            if dt <= now:
+                dt = dt + timedelta(days=1)
+            schedule_at = dt.strftime("%Y-%m-%dT%H:%M:%S")
+        if any(k in text for k in ["早上", "上午"]):
+            h, m = _parse_time_hhmm(text)
+            h = 9 if h is None else h
+            m = 0 if m is None else m
+            dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            if dt <= now:
+                dt = dt + timedelta(days=1)
+            schedule_at = dt.strftime("%Y-%m-%dT%H:%M:%S")
+        if any(k in text for k in ["下午"]):
+            h, m = _parse_time_hhmm(text)
+            h = 15 if h is None else h
+            m = 0 if m is None else m
+            dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            if dt <= now:
+                dt = dt + timedelta(days=1)
+            schedule_at = dt.strftime("%Y-%m-%dT%H:%M:%S")
+        if "每周" in text:
+            weekday_map = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6}
+            m = re.search(r"每周([一二三四五六日天])", text)
+            if m:
+                target = weekday_map[m.group(1)]
+                h, m2 = _parse_time_hhmm(text)
+                h = 9 if h is None else h
+                m2 = 0 if m2 is None else m2
+                dt = _next_weekday(now, target).replace(hour=h, minute=m2, second=0, microsecond=0)
+                schedule_at = dt.strftime("%Y-%m-%dT%H:%M:%S")
+        if "每天" in text:
+            h, m = _parse_time_hhmm(text)
+            if h is not None:
+                dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                if dt <= now:
+                    dt = dt + timedelta(days=1)
+                schedule_at = dt.strftime("%Y-%m-%dT%H:%M:%S")
 
     return schedule_at, schedule_every, schedule_until
 
@@ -409,6 +492,24 @@ def auto_detect_task(instruction: str):
 
     schedule_at, schedule_every, schedule_until = _parse_schedule_from_text(instruction)
     return task_type, payload, output, schedule_at, schedule_every, schedule_until
+
+
+def auto_detect_tasks(instruction: str):
+    parts = [p.strip() for p in re.split(r"[；;\n]+", instruction) if p.strip()]
+    tasks = []
+    for part in parts:
+        task_type, payload, output, sch_at, sch_every, sch_until = auto_detect_task(part)
+        if task_type or sch_at or sch_every:
+            tasks.append({
+                "task_type": task_type or "email",
+                "task_payload": payload or {},
+                "output": output or {},
+                "schedule_at": sch_at,
+                "schedule_every": sch_every,
+                "schedule_until": sch_until,
+                "raw": part,
+            })
+    return tasks
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "60"))
 
@@ -898,14 +999,17 @@ def process_email(mailbox_name, ai_name, backend, em):
     if search_res: instr = search_res + "\n\n" + instr
     
     sub, body, sch_at, sch_every, sch_until, atts, task_type, task_payload, output = call_ai(ai_name, backend, instr)
+    detected_tasks = []
     if not task_type:
-        det_type, det_payload, det_output, det_at, det_every, det_until = auto_detect_task(em["body"] or "")
-        task_type = det_type or task_type
-        if not task_payload and det_payload: task_payload = det_payload
-        if not output and det_output: output = det_output
-        if not sch_at and det_at: sch_at = det_at
-        if not sch_every and det_every: sch_every = det_every
-        if not sch_until and det_until: sch_until = det_until
+        detected_tasks = auto_detect_tasks(em["body"] or "")
+        if detected_tasks:
+            det = detected_tasks[0]
+            task_type = det.get("task_type") or task_type
+            if not task_payload and det.get("task_payload"): task_payload = det.get("task_payload")
+            if not output and det.get("output"): output = det.get("output")
+            if not sch_at and det.get("schedule_at"): sch_at = det.get("schedule_at")
+            if not sch_every and det.get("schedule_every"): sch_every = det.get("schedule_every")
+            if not sch_until and det.get("schedule_until"): sch_until = det.get("schedule_until")
     sub = sub or (em["subject"] if em["subject"].startswith("Re:") else f"Re: {em['subject']}")
     
     if sch_at or sch_every:
@@ -933,6 +1037,33 @@ def process_email(mailbox_name, ai_name, backend, em):
             )
         else:
             send_reply(MAILBOXES[mailbox_name], em["from_email"], f"已安排定时任务：{sub}", f"您的任务已安排在 {sch_at} 左右执行。\n\n内容预览：\n{body}")
+    elif detected_tasks:
+        summaries = []
+        for idx, det in enumerate(detected_tasks, 1):
+            d_sub = f"{sub} - {det.get('task_type', 'email')}"
+            d_body = body if det.get("task_type") == "email" else ""
+            scheduler.add_task(
+                mailbox_name,
+                em["from_email"],
+                d_sub,
+                d_body,
+                det.get("schedule_at"),
+                det.get("schedule_every"),
+                det.get("schedule_until"),
+                det.get("task_type") or "email",
+                det.get("task_payload") or {},
+                det.get("output") or {},
+                [],
+            )
+            summaries.append(
+                f"{idx}. {det.get('task_type')} | at={det.get('schedule_at') or '-'} | every={det.get('schedule_every') or '-'} | until={det.get('schedule_until') or '-'}"
+            )
+        send_reply(
+            MAILBOXES[mailbox_name],
+            em["from_email"],
+            f"已安排 {len(detected_tasks)} 个定时任务：{sub}",
+            "任务列表：\n" + "\n".join(summaries),
+        )
     else:
         send_reply(MAILBOXES[mailbox_name], em["from_email"], sub, body, em.get("message_id"), atts)
     

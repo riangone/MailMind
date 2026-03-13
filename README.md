@@ -119,6 +119,14 @@ export NEWS_DEFAULT_PAGE_SIZE="8"
 - `YYYY-MM-DD HH:MM` 或 `YYYY-MM-DD` 会解析为 `schedule_at`
 - `截止 YYYY-MM-DD` 会解析为 `schedule_until`
 
+支持更多自然时间：
+- `今天/明天/今晚/早上/下午` + 时间（如 `明天 8:30`）
+- `每天 18:00` 会自动生成 `schedule_every=1d` 与下一次执行时间
+- `每周一 10:00` 会自动生成 `schedule_every=7d` 与下一次执行时间
+
+多任务识别：
+- 使用分号、中文分号或换行分隔，可自动拆分成多个任务并分别定时执行
+
 #### 📮 126 / 163 / QQ 邮箱（授权码方式）
 
 1. 登录网页版邮箱 → **设置** → **POP3/IMAP/SMTP**

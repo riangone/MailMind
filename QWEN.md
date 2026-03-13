@@ -18,6 +18,7 @@
 | 核心依赖 | `requests`, `imapclient` |
 | 可选依赖 | `google-auth`, `google-auth-oauthlib`, `google-auth-httplib2` (Gmail OAuth), `msal` (Outlook OAuth) |
 | 部署方式 | 后台进程 / systemd 服务 |
+| 定时任务 | AI 任务、天气、新闻、网页检索、日报汇总（支持归档） |
 
 ## 项目结构
 
@@ -55,6 +56,23 @@ pip install google-auth google-auth-oauthlib google-auth-httplib2
 
 # 可选：Outlook OAuth 支持
 pip install msal
+```
+
+### 定时任务与外部数据（默认方案）
+
+```bash
+export WEATHER_API_KEY="your_weatherapi_key"
+export NEWS_API_KEY="your_newsapi_key"
+export BING_API_KEY="your_bing_search_key"
+export TASK_DEFAULT_AI="openai"
+```
+
+可选默认参数：
+
+```bash
+export WEATHER_DEFAULT_LOCATION="Tokyo"
+export NEWS_DEFAULT_QUERY="technology OR AI"
+export NEWS_DEFAULT_LANGUAGE="zh"
 ```
 
 ### 配置
@@ -172,10 +190,23 @@ fetch_unread_emails() → process_email() → call_ai() → send_reply()
    {
      "subject": "邮件标题",
      "body": "回复正文",
-     "attachments": [{"filename": "report.md", "content": "文件内容"}]
+     "schedule_at": "可选：ISO 或相对秒",
+     "schedule_every": "可选：5m/2h",
+     "schedule_until": "可选：截止时间",
+     "attachments": [{"filename": "report.md", "content": "文件内容"}],
+     "task_type": "email|ai_job|weather|news|web_search|report",
+     "task_payload": {"location": "...", "query": "...", "prompt": "..."},
+     "output": {"email": true, "archive": true, "archive_dir": "reports"}
    }
    ```
 6. **发送回复**: `send_reply()` 通过 SMTP 发送回复（含附件）
+
+### 自动识别与多任务
+
+未显式提供 `task_type` 时，系统会根据关键词自动识别任务类型并解析时间：
+- 关键词：`天气`/`新闻`/`检索`/`搜索`/`日报`/`AI`
+- 时间：`每 X 分钟/小时/天`、`每天 18:00`、`每周一 10:00`、`今天/明天/今晚/早上/下午`
+- 多任务：用分号或换行分隔，可拆分多个任务分别定时执行
 
 ### 附件支持
 

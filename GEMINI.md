@@ -11,6 +11,7 @@
     - **API 接口**: Anthropic, OpenAI, Gemini API, 通义千问 API。
 - **关键库**: `imaplib`, `smtplib`, `requests`, `imapclient` (用于 IDLE 模式)。
 - **服务管理**: 使用 Bash 脚本 (`manage.sh`) 进行生命周期管理，并支持 systemd 服务集成。
+- **定时任务扩展**: 支持定时 AI 任务、天气、新闻、网页检索、日报汇总，并可归档结果。
 
 ## 📂 项目结构
 
@@ -60,6 +61,23 @@
 - `MAILBOX`: 指定使用的邮箱配置（如 `126`, `gmail`, `outlook`）。
 - `AI`: 指定使用的 AI 后端（如 `claude`, `gemini-api`, `anthropic`）。
 - `MAIL_<NAME>_ALLOWED`: **安全白名单**，仅允许来自特定地址或域名的邮件触发 AI。
+
+定时任务相关（默认方案）：
+- `WEATHER_API_KEY`（WeatherAPI）
+- `NEWS_API_KEY`（NewsAPI）
+- `BING_API_KEY`（Bing Web Search）
+- `TASK_DEFAULT_AI`（定时任务默认 AI）
+- 可选：`WEATHER_DEFAULT_LOCATION`、`NEWS_DEFAULT_QUERY`、`NEWS_DEFAULT_LANGUAGE`
+
+### 定时任务与自动识别
+
+当邮件指令包含定时信息时，系统会创建任务并由调度器执行。支持任务类型：
+`email` / `ai_job` / `weather` / `news` / `web_search` / `report`
+
+自动识别规则（未显式指定 `task_type` 时生效）：
+- 关键词：天气/新闻/检索/搜索/日报/AI
+- 时间解析：`每 X 分钟/小时/天`、`每天 18:00`、`每周一 10:00`、`今天/明天/今晚/早上/下午`
+- 多任务：用分号或换行分隔会拆分为多个任务
 
 ### 安全建议
 - **白名单机制**: 务必配置 `ALLOWED` 变量，防止接口被非法调用。
