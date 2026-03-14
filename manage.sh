@@ -1,7 +1,7 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-#  邮件 AI 守护进程管理脚本
-#  用法: bash manage.sh [setup|start|stop|restart|status|log|install]
+#  MailMind 统一管理脚本
+#  用法: bash manage.sh [setup|start|stop|restart|status|log|webui ...]
 # ═══════════════════════════════════════════════════════════════
 
 # ─── 固定路径 ──────────────────────────────────────────────────
@@ -12,6 +12,8 @@ SCRIPT="$INSTALL_DIR/email_daemon.py"
 SERVICE_NAME="email-daemon"
 LOG_FILE="$INSTALL_DIR/daemon.log"
 PID_FILE="$INSTALL_DIR/daemon.pid"
+WEBUI_LOG_FILE="$INSTALL_DIR/webui.log"
+WEBUI_PID_FILE="$INSTALL_DIR/webui.pid"
 ENV_FILE="$INSTALL_DIR/.env"
 
 RED='\033[0;31m'
@@ -308,9 +310,10 @@ do_setup() {
 }
 
 get_pid() {
-    if [ -f "$PID_FILE" ]; then
+    local pidfile="${1:-$PID_FILE}"
+    if [ -f "$pidfile" ]; then
         local pid
-        pid=$(cat "$PID_FILE")
+        pid=$(cat "$pidfile")
         if kill -0 "$pid" 2>/dev/null; then
             echo "$pid"
         fi
@@ -319,11 +322,11 @@ get_pid() {
 
 do_start() {
     load_env
-    heading "启动服务"
+    heading "启动邮件守护进程"
     local pid
-    pid=$(get_pid)
+    pid=$(get_pid "$PID_FILE")
     if [ -n "$pid" ]; then
-        warn "服务已在运行中 (PID: $pid)"
+        warn "邮件守护进程已在运行中 (PID: $pid)"
         return 1
     fi
 
@@ -352,10 +355,10 @@ do_start() {
     echo $! > "$PID_FILE"
     sleep 1
 
-    pid=$(get_pid)
+    pid=$(get_pid "$PID_FILE")
     if [ -n "$pid" ]; then
-        info "服务已启动 (PID: $pid)"
-        info "日志文件: $LOG_FILE"
+        info "邮件守护进程已启动 (PID: $pid)"
+        info "日志: $LOG_FILE"
         info "邮箱: $MAILBOX | AI: $AI | 模式: ${MODE:-idle}"
     else
         error "启动失败，查看日志: tail -f $LOG_FILE"
@@ -365,21 +368,21 @@ do_start() {
 
 do_stop() {
     load_env
-    heading "停止服务"
+    heading "停止邮件守护进程"
     local pid
-    pid=$(get_pid)
+    pid=$(get_pid "$PID_FILE")
     if [ -z "$pid" ]; then
-        warn "服务未在运行"
+        warn "邮件守护进程未在运行"
         return 0
     fi
     kill "$pid"
     rm -f "$PID_FILE"
-    info "服务已停止 (PID: $pid)"
+    info "邮件守护进程已停止 (PID: $pid)"
 }
 
 do_restart() {
     load_env
-    heading "重启服务"
+    heading "重启邮件守护进程"
     do_stop
     sleep 2
     do_start
@@ -387,23 +390,36 @@ do_restart() {
 
 do_status() {
     load_env
-    heading "服务状态"
-    local pid
-    pid=$(get_pid)
+    heading "运行状态"
+    local pid wpid
+    pid=$(get_pid "$PID_FILE")
+    wpid=$(get_pid "$WEBUI_PID_FILE")
+
+    echo ""
     if [ -n "$pid" ]; then
-        info "状态: ${GREEN}运行中${NC} (PID: $pid)"
-        info "邮箱: $MAILBOX | AI: $AI"
-        info "日志: $LOG_FILE"
-        echo ""
-        echo "最近 5 条日志:"
-        tail -5 "$LOG_FILE" 2>/dev/null || echo "（暂无日志）"
+        echo -e "  邮件守护进程  ${GREEN}● 运行中${NC}  PID=$pid  邮箱=$MAILBOX  AI=$AI"
     else
-        warn "状态: 未运行"
+        echo -e "  邮件守护进程  ${RED}○ 未运行${NC}"
+    fi
+    if [ -n "$wpid" ]; then
+        local webui_host webui_port
+        webui_host=$(grep -o 'WEBUI_HOST=[^ ]*' "$WEBUI_PID_FILE.meta" 2>/dev/null | cut -d= -f2 || echo "0.0.0.0")
+        webui_port=$(grep -o 'WEBUI_PORT=[^ ]*' "$WEBUI_PID_FILE.meta" 2>/dev/null | cut -d= -f2 || echo "8000")
+        echo -e "  Web UI        ${GREEN}● 运行中${NC}  PID=$wpid  http://${webui_host}:${webui_port}"
+    else
+        echo -e "  Web UI        ${RED}○ 未运行${NC}"
+    fi
+    echo ""
+
+    if [ -n "$pid" ]; then
+        echo "邮件守护进程最近日志:"
+        tail -5 "$LOG_FILE" 2>/dev/null || echo "（暂无日志）"
+        echo ""
     fi
 }
 
 do_log() {
-    heading "实时日志 (Ctrl+C 退出)"
+    heading "邮件守护进程实时日志 (Ctrl+C 退出)"
     tail -f "$LOG_FILE"
 }
 
@@ -451,11 +467,8 @@ do_uninstall() {
     info "systemd 服务已卸载"
 }
 
-do_webui() {
+_ensure_webui_deps() {
     ensure_venv
-    local host="${2:-0.0.0.0}"
-    local port="${3:-8000}"
-    # 检查 fastapi 是否已安装
     if ! "$VENV_PYTHON" -c "import fastapi" 2>/dev/null; then
         info "正在安装 Web UI 依赖..."
         "$VENV_PIP" install "fastapi>=0.110.0" "uvicorn[standard]>=0.29.0" "jinja2>=3.1.0" "python-multipart>=0.0.9" --quiet || {
@@ -463,11 +476,88 @@ do_webui() {
             exit 1
         }
     fi
-    heading "启动 Web UI"
-    info "地址: http://${host}:${port}"
-    info "按 Ctrl+C 停止"
-    cd "$INSTALL_DIR"
-    exec "$VENV_PYTHON" -m webui.server --host "$host" --port "$port"
+}
+
+do_webui() {
+    local subcmd="${2:-start}"
+    local host="${WEBUI_HOST:-0.0.0.0}"
+    local port="${WEBUI_PORT:-8000}"
+
+    # 允许 bash manage.sh webui <host> <port> 直接传参（兼容旧用法）
+    if [[ "${2}" =~ ^[0-9] ]] || [[ "${2}" == *"."* ]]; then
+        host="${2:-0.0.0.0}"
+        port="${3:-8000}"
+        subcmd="start"
+    fi
+
+    case "$subcmd" in
+        start)
+            _ensure_webui_deps
+            local wpid
+            wpid=$(get_pid "$WEBUI_PID_FILE")
+            if [ -n "$wpid" ]; then
+                warn "Web UI 已在运行中 (PID: $wpid)  http://${host}:${port}"
+                return 1
+            fi
+            heading "启动 Web UI"
+            cd "$INSTALL_DIR"
+            nohup "$VENV_PYTHON" -m webui.server --host "$host" --port "$port" \
+                >> "$WEBUI_LOG_FILE" 2>&1 &
+            echo $! > "$WEBUI_PID_FILE"
+            echo "WEBUI_HOST=${host} WEBUI_PORT=${port}" > "${WEBUI_PID_FILE}.meta"
+            sleep 1
+            wpid=$(get_pid "$WEBUI_PID_FILE")
+            if [ -n "$wpid" ]; then
+                info "Web UI 已启动 (PID: $wpid)"
+                info "地址: http://${host}:${port}"
+                info "日志: $WEBUI_LOG_FILE"
+            else
+                error "Web UI 启动失败，查看日志: tail -f $WEBUI_LOG_FILE"
+                return 1
+            fi
+            ;;
+        stop)
+            heading "停止 Web UI"
+            local wpid
+            wpid=$(get_pid "$WEBUI_PID_FILE")
+            if [ -z "$wpid" ]; then
+                warn "Web UI 未在运行"
+                return 0
+            fi
+            kill "$wpid"
+            rm -f "$WEBUI_PID_FILE" "${WEBUI_PID_FILE}.meta"
+            info "Web UI 已停止 (PID: $wpid)"
+            ;;
+        restart)
+            do_webui "" stop
+            sleep 1
+            do_webui "" start
+            ;;
+        status)
+            heading "Web UI 状态"
+            local wpid
+            wpid=$(get_pid "$WEBUI_PID_FILE")
+            if [ -n "$wpid" ]; then
+                info "状态: ${GREEN}运行中${NC} (PID: $wpid)"
+                info "地址: http://${host}:${port}"
+                info "日志: $WEBUI_LOG_FILE"
+                echo ""
+                echo "最近 5 条日志:"
+                tail -5 "$WEBUI_LOG_FILE" 2>/dev/null || echo "（暂无日志）"
+            else
+                warn "状态: 未运行"
+            fi
+            ;;
+        log)
+            heading "Web UI 实时日志 (Ctrl+C 退出)"
+            tail -f "$WEBUI_LOG_FILE"
+            ;;
+        *)
+            error "未知子命令: $subcmd"
+            echo "  用法: bash manage.sh webui [start|stop|restart|status|log]"
+            exit 1
+            ;;
+    esac
 }
 
 # ─── 入口 ──────────────────────────────────────────────────────
@@ -485,15 +575,25 @@ case "$1" in
         echo ""
         echo "用法: bash manage.sh <命令>"
         echo ""
-        echo "  setup      一键配置向导（首次使用从这里开始）"
-        echo "  start      启动守护进程（后台运行）"
-        echo "  stop       停止守护进程"
-        echo "  restart    重启守护进程"
-        echo "  status     查看运行状态和最近日志"
-        echo "  log        实时查看日志"
-        echo "  webui      启动 Web 管理界面 [host] [port]（默认 0.0.0.0:8000）"
-        echo "  install    安装为 systemd 服务（开机自启）"
-        echo "  uninstall  卸载 systemd 服务"
+        echo "  setup                   一键配置向导（首次使用从这里开始）"
+        echo ""
+        echo "  邮件守护进程:"
+        echo "    start                 后台启动邮件守护进程"
+        echo "    stop                  停止邮件守护进程"
+        echo "    restart               重启邮件守护进程"
+        echo "    status                查看两个服务的运行状态"
+        echo "    log                   实时查看邮件守护进程日志"
+        echo ""
+        echo "  Web UI:"
+        echo "    webui [start]         后台启动 Web 管理界面（默认 0.0.0.0:8000）"
+        echo "    webui stop            停止 Web UI"
+        echo "    webui restart         重启 Web UI"
+        echo "    webui status          查看 Web UI 状态"
+        echo "    webui log             实时查看 Web UI 日志"
+        echo ""
+        echo "  系统服务:"
+        echo "    install               安装为 systemd 服务（开机自启）"
+        echo "    uninstall             卸载 systemd 服务"
         echo ""
         ;;
 esac
