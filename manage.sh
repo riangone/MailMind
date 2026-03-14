@@ -479,6 +479,7 @@ _ensure_webui_deps() {
 }
 
 do_webui() {
+    [ -f "$ENV_FILE" ] && load_env
     local subcmd="${2:-start}"
     local host="${WEBUI_HOST:-0.0.0.0}"
     local port="${WEBUI_PORT:-8000}"
