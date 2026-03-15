@@ -432,24 +432,6 @@
     .ai-desc { font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; font-weight: 300; color: var(--muted); line-height: 1.5; }
     .ai-req { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: var(--muted); opacity: 0.7; margin-top: 2px; }
 
-    /* ── COMPARISON ── */
-    #compare { padding: 90px 48px; background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-    .compare-sub { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 300; color: var(--muted); line-height: 1.8; max-width: 600px; margin-bottom: 48px; }
-    .compare-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
-    thead tr { background: var(--bg3); border-bottom: 1px solid var(--border); }
-    thead th { padding: 16px 20px; text-align: left; font-weight: 600; font-size: 0.76rem; letter-spacing: 0.06em; }
-    thead th:first-child { color: var(--muted); }
-    thead th:nth-child(2) { color: var(--cyan); }
-    thead th:nth-child(3) { color: var(--muted); }
-    tbody tr { border-bottom: 1px solid var(--border); background: var(--card-bg); transition: background 0.15s; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--bg3); }
-    tbody td { padding: 14px 20px; color: var(--muted); vertical-align: middle; }
-    tbody td:first-child { color: var(--text); font-weight: 500; }
-    .check { color: var(--cyan); font-weight: 600; }
-    .cross { color: var(--muted); opacity: 0.5; }
-    .highlight-col { color: var(--text) !important; }
 
     /* ── TASKS ── */
     #tasks { padding: 90px 48px; }
@@ -533,7 +515,7 @@
       .nav-cta { display: none; }
       .nav-controls { gap: 8px; }
       .lang-btn { padding: 4px 6px; font-size: 0.6rem; }
-      #features, #ai, #start, #cta, #tasks, #compare, #webui { padding: 60px 20px; }
+      #features, #ai, #start, #cta, #tasks, #webui { padding: 60px 20px; }
       #how, #mailboxes { padding: 60px 20px; }
       .webui-inner { grid-template-columns: 1fr; gap: 36px; }
       .steps { grid-template-columns: 1fr; gap: 30px; }
@@ -559,7 +541,6 @@
     <li><a href="#how" data-i18n="nav_how"></a></li>
     <li><a href="#webui" data-i18n="nav_webui"></a></li>
     <li><a href="#ai" data-i18n="nav_ai"></a></li>
-    <li><a href="#compare" data-i18n="nav_compare"></a></li>
     <li><a href="#start" data-i18n="nav_start"></a></li>
   </ul>
   <div class="nav-controls">
@@ -770,37 +751,6 @@
   </div>
 </section>
 
-<!-- ══ COMPARISON ══ -->
-<section id="compare">
-  <div class="section-wrap">
-    <span class="section-label" data-i18n="cmp_label"></span>
-    <h2 class="section-title" data-i18n="cmp_title"></h2>
-    <p class="compare-sub reveal" data-i18n="cmp_sub"></p>
-
-    <div class="compare-table-wrap reveal">
-      <table>
-        <thead>
-          <tr>
-            <th data-i18n="cmp_col_feat"></th>
-            <th>✦ MailMind</th>
-            <th data-i18n="cmp_col_others"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td data-i18n="cmp_r1_feat"></td><td class="highlight-col check" data-i18n="cmp_r1_mm"></td><td class="cross" data-i18n="cmp_r1_ot"></td></tr>
-          <tr><td data-i18n="cmp_r2_feat"></td><td class="highlight-col check" data-i18n="cmp_r2_mm"></td><td class="cross" data-i18n="cmp_r2_ot"></td></tr>
-          <tr><td data-i18n="cmp_r3_feat"></td><td class="highlight-col check" data-i18n="cmp_r3_mm"></td><td class="cross" data-i18n="cmp_r3_ot"></td></tr>
-          <tr><td data-i18n="cmp_r4_feat"></td><td class="highlight-col check" data-i18n="cmp_r4_mm"></td><td class="cross" data-i18n="cmp_r4_ot"></td></tr>
-          <tr><td data-i18n="cmp_r5_feat"></td><td class="highlight-col check" data-i18n="cmp_r5_mm"></td><td class="cross" data-i18n="cmp_r5_ot"></td></tr>
-          <tr><td data-i18n="cmp_r6_feat"></td><td class="highlight-col check" data-i18n="cmp_r6_mm"></td><td class="cross" data-i18n="cmp_r6_ot"></td></tr>
-          <tr><td data-i18n="cmp_r7_feat"></td><td class="highlight-col check" data-i18n="cmp_r7_mm"></td><td class="cross" data-i18n="cmp_r7_ot"></td></tr>
-          <tr><td data-i18n="cmp_r8_feat"></td><td class="highlight-col check" data-i18n="cmp_r8_mm"></td><td class="cross" data-i18n="cmp_r8_ot"></td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
 <!-- ══ SCHEDULED TASKS ══ -->
 <section id="tasks">
   <div class="section-wrap">
@@ -928,7 +878,7 @@
 const T = {
   en: {
     wip_text: '🚧 Under active development — current version may have bugs &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/issues" target="_blank">Report an issue</a> &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/pulls" target="_blank">Submit a PR</a> &nbsp;·&nbsp; Updates ship regularly',
-    nav_features: 'Features', nav_how: 'How it works', nav_webui: 'Web UI', nav_ai: 'AI Backends', nav_compare: 'vs OpenClaw', nav_start: 'Quick Start',
+    nav_features: 'Features', nav_how: 'How it works', nav_webui: 'Web UI', nav_ai: 'AI Backends', nav_start: 'Quick Start',
     hero_badge: 'open source · email-to-ai bridge',
     hero_h1: 'Your inbox is now<br/><em>an AI interface</em>',
     hero_sub: 'Send an email with any instruction. MailMind routes it to Claude, GPT, Gemini, or Qwen — and replies with the result. No app. No new interface. Just email.',
@@ -968,18 +918,6 @@ const T = {
     ai_cli_req: 'Requires CLI install + auth',
     ai_anthropic_desc: 'Claude via API key', ai_openai_desc: 'GPT-4o via API key', ai_gemini_desc: 'Gemini via API key', ai_qwen_desc: 'Qwen via API key', ai_deepseek_desc: 'DeepSeek via API key', ai_copilot_desc: 'GitHub Copilot token',
     ai_groq_desc: 'Llama via Groq ultra-fast inference', ai_perplexity_desc: 'Perplexity search-augmented AI', ai_cohere_desc: 'Cohere enterprise API', ai_moonshot_desc: 'Moonshot Kimi API', ai_glm_desc: 'Zhipu GLM API', ai_spark_desc: 'iFlytek Spark API', ai_ernie_desc: 'Baidu Ernie API', ai_yi_desc: '01.AI Yi API',
-    cmp_label: 'Compare',
-    cmp_title: 'Choose your AI Experience',
-    cmp_sub: 'Web-based tools like OpenClaw offer rich, real-time interactive experiences ideal for long creative sessions. MailMind is designed for a different purpose: asynchronous productivity within your existing workflow, working wherever your email does.',
-    cmp_col_feat: 'Feature', cmp_col_others: 'Web-based AI Tools',
-    cmp_r1_feat: 'Primary Interface', cmp_r1_mm: 'Email — zero new UI to learn', cmp_r1_ot: 'Rich, Visual Web Interface',
-    cmp_r2_feat: 'Interaction Style', cmp_r2_mm: 'Asynchronous (Fire and forget)', cmp_r2_ot: 'Real-time (Chat and wait)',
-    cmp_r3_feat: 'Workflow Integration', cmp_r3_mm: 'Existing inbox (Mobile/Desktop)', cmp_r3_ot: 'Dedicated Tab / Browser',
-    cmp_r4_feat: 'Automation', cmp_r4_mm: '✓ Built-in Task Scheduling', cmp_r4_ot: 'Focus on Real-time Chat',
-    cmp_r5_feat: 'Resource Usage', cmp_r5_mm: 'Low — runs as a background service', cmp_r5_ot: 'Requires Browser Engine',
-    cmp_r6_feat: 'Availability', cmp_r6_mm: 'Any device with email support', cmp_r6_ot: 'Modern Browser required',
-    cmp_r7_feat: 'Context Management', cmp_r7_mm: '✓ Email Threads & Attachments', cmp_r7_ot: '✓ Rich Session History',
-    cmp_r8_feat: 'System Footprint', cmp_r8_mm: 'Minimal (Python Service)', cmp_r8_ot: 'Moderate (Web App Stack)',
     task_label: 'Scheduled Tasks', task_title: 'Automate your information diet',
     task_p1: 'Write natural-language schedules in your email. MailMind parses time expressions in Chinese, Japanese, Korean, and English — and executes tasks automatically.',
     task_p2: 'Results are emailed to you and/or archived to reports/ as timestamped files. SQLite ensures tasks are never missed.',
@@ -1004,7 +942,7 @@ const T = {
 
   zh: {
     wip_text: '🚧 项目持续更新中，当前版本可能存在 bug &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/issues" target="_blank">反馈问题</a> &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/pulls" target="_blank">提交 PR</a> &nbsp;·&nbsp; 欢迎共建',
-    nav_features: '功能', nav_how: '工作原理', nav_webui: 'Web UI', nav_ai: 'AI 后端', nav_compare: '对比 OpenClaw', nav_start: '快速开始',
+    nav_features: '功能', nav_how: '工作原理', nav_webui: 'Web UI', nav_ai: 'AI 后端', nav_start: '快速开始',
     hero_badge: '开源 · 邮件转 AI 网关',
     hero_h1: '你的收件箱<br/>现在是 <em>AI 接口</em>',
     hero_sub: '发一封邮件写下你的指令，MailMind 将其转发给 Claude、GPT、Gemini 或 Qwen，然后把结果回复到你的邮箱。无需安装 App，无需学习新界面，邮件就是一切。',
@@ -1044,18 +982,6 @@ const T = {
     ai_cli_req: '需安装 CLI 并完成认证',
     ai_anthropic_desc: 'Claude API 调用', ai_openai_desc: 'GPT-4o API 调用', ai_gemini_desc: 'Gemini API 调用', ai_qwen_desc: '通义千问 API 调用', ai_deepseek_desc: 'DeepSeek API 调用', ai_copilot_desc: 'GitHub Copilot Token',
     ai_groq_desc: 'Groq 高速推理（Llama）', ai_perplexity_desc: 'Perplexity 搜索增强 AI', ai_cohere_desc: 'Cohere 企业级 API', ai_moonshot_desc: '月之暗面 Kimi API', ai_glm_desc: '智谱 GLM API', ai_spark_desc: '讯飞星火 API', ai_ernie_desc: '百度文心一言 API', ai_yi_desc: '零一万物 Yi API',
-    cmp_label: '对比',
-    cmp_title: '选择适合你的 AI 体验',
-    cmp_sub: 'OpenClaw 等 Web 工具提供了丰富、直观的实时交互体验，非常适合沉浸式对话和长文本创作。而 MailMind 则专注于异步生产力：它无缝集成在你已有的收件箱中，让你无需等待响应，在任何设备上都能随时随地调度 AI。',
-    cmp_col_feat: '功能特性', cmp_col_others: 'Web AI 工具 (如 OpenClaw)',
-    cmp_r1_feat: '主要界面', cmp_r1_mm: '邮件 — 零新界面学习成本', cmp_r1_ot: '丰富、直观的 Web 界面',
-    cmp_r2_feat: '交互方式', cmp_r2_mm: '异步 (即发即走，无需等待)', cmp_r2_ot: '实时 (对话式，需停留等待)',
-    cmp_r3_feat: '工作流集成', cmp_r3_mm: '原生集成收件箱 (手机/电脑)', cmp_r3_ot: '独立的浏览器标签页 / App',
-    cmp_r4_feat: '自动化能力', cmp_r4_mm: '✓ 内置定时任务调度', cmp_r4_ot: '侧重于实时对话',
-    cmp_r5_feat: '资源占用', cmp_r5_mm: '极低 — 作为后台服务运行', cmp_r5_ot: '需占用浏览器引擎资源',
-    cmp_r6_feat: '设备兼容性', cmp_r6_mm: '任何支持邮件的终端', cmp_r6_ot: '需现代浏览器支持',
-    cmp_r7_feat: '上下文管理', cmp_r7_mm: '✓ 邮件往来与附件历史', cmp_r7_ot: '✓ 丰富的会话管理界面',
-    cmp_r8_feat: '核心定位', cmp_r8_mm: '轻量化后端守护进程', cmp_r8_ot: '全功能 Web 交互应用',
     task_label: '定时任务', task_title: '自动化你的信息获取',
     task_p1: '在邮件中用自然语言写下定时计划，MailMind 解析中、日、韩、英四种语言的时间表达，自动执行任务。',
     task_p2: '结果可通过邮件发送给你，也可归档到 reports/ 目录，以时间戳命名保存。',
@@ -1080,7 +1006,7 @@ const T = {
 
   ja: {
     wip_text: '🚧 継続開発中 — 現バージョンにはバグが含まれる可能性があります &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/issues" target="_blank">Issue を報告</a> &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/pulls" target="_blank">PR を送る</a> &nbsp;·&nbsp; 定期更新中',
-    nav_features: '機能', nav_how: '仕組み', nav_webui: 'Web UI', nav_ai: 'AI バックエンド', nav_compare: 'vs OpenClaw', nav_start: 'クイックスタート',
+    nav_features: '機能', nav_how: '仕組み', nav_webui: 'Web UI', nav_ai: 'AI バックエンド', nav_start: 'クイックスタート',
     hero_badge: 'オープンソース · メール to AI ブリッジ',
     hero_h1: 'あなたの受信箱が<br/><em>AI インターフェース</em>に',
     hero_sub: 'メールで指示を送るだけ。MailMind が Claude、GPT、Gemini、Qwen に橋渡しし、結果をメールで返信します。アプリ不要。新しいUIも不要。メールだけ。',
@@ -1120,18 +1046,6 @@ const T = {
     ai_cli_req: 'CLIインストール・認証が必要',
     ai_anthropic_desc: 'Claude APIキー', ai_openai_desc: 'GPT-4o APIキー', ai_gemini_desc: 'Gemini APIキー', ai_qwen_desc: 'Qwen APIキー', ai_deepseek_desc: 'DeepSeek APIキー', ai_copilot_desc: 'GitHub Copilotトークン',
     ai_groq_desc: 'Groq 高速推論（Llama）', ai_perplexity_desc: 'Perplexity 検索拡張 AI', ai_cohere_desc: 'Cohere エンタープライズ API', ai_moonshot_desc: '月之暗面 Kimi API', ai_glm_desc: '智谱 GLM API', ai_spark_desc: '讯飞 Spark API', ai_ernie_desc: '百度 Ernie API', ai_yi_desc: '零一万物 Yi API',
-    cmp_label: 'なぜ他のツールではなく？',
-    cmp_title: 'MailMind vs OpenClaw<br/>& 類似ツール',
-    cmp_sub: 'OpenClawなどのAIツールは通常、ブラウザ・専用アプリ・常時オンラインを必要とします。MailMindはメールを使います — どこでも使えるユニバーサルで非同期なインターフェース。',
-    cmp_col_feat: '機能', cmp_col_others: 'OpenClaw / WebAIツール',
-    cmp_r1_feat: 'インターフェース', cmp_r1_mm: 'メール — 新UIを学ばなくてよい', cmp_r1_ot: 'ブラウザ / 専用アプリ',
-    cmp_r2_feat: 'AIバックエンド柔軟性', cmp_r2_mm: '18（CLI & API）', cmp_r2_ot: '通常1つのAIに固定',
-    cmp_r3_feat: 'メールボックス連携', cmp_r3_mm: '8 プロバイダー＋自動検出', cmp_r3_ot: 'なし',
-    cmp_r4_feat: 'スケジュール自動化', cmp_r4_mm: '✓ 7タイプ内蔵', cmp_r4_ot: '✗ または有料',
-    cmp_r5_feat: 'セルフホスト/オフライン', cmp_r5_mm: '✓ ローカル完全制御', cmp_r5_ot: '✗ クラウド依存',
-    cmp_r6_feat: '添付ファイル', cmp_r6_mm: '✓ 送受信対応', cmp_r6_ot: 'ツールにより異なる',
-    cmp_r7_feat: 'ブラウザ不要', cmp_r7_mm: '✓ 純粋なデーモン', cmp_r7_ot: '✗ ブラウザ/UI必要',
-    cmp_r8_feat: 'オープンソース', cmp_r8_mm: '✓ MITライセンス', cmp_r8_ot: '多くはクローズド',
     task_label: '定期タスク', task_title: '情報収集を自動化',
     task_p1: 'メールに自然言語でスケジュールを記述。中国語・日本語・韓国語・英語の時間表現を解析し、タスクを自動実行。',
     task_p2: '結果はメール送信またはreports/にアーカイブ保存できます。',
@@ -1156,7 +1070,7 @@ const T = {
 
   ko: {
     wip_text: '🚧 지속 개발 중 — 현재 버전에 버그가 있을 수 있습니다 &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/issues" target="_blank">이슈 보고</a> &nbsp;·&nbsp; <a href="https://github.com/riangone/MailMindAgent/pulls" target="_blank">PR 제출</a> &nbsp;·&nbsp; 정기 업데이트 중',
-    nav_features: '기능', nav_how: '작동 원리', nav_ai: 'AI 백엔드', nav_compare: 'vs OpenClaw', nav_start: '빠른 시작',
+    nav_features: '기능', nav_how: '작동 원리', nav_webui: 'Web UI', nav_ai: 'AI 백엔드', nav_start: '빠른 시작',
     hero_badge: '오픈소스 · 이메일 to AI 브리지',
     hero_h1: '받은 편지함이<br/><em>AI 인터페이스</em>가 됩니다',
     hero_sub: '이메일로 지시를 보내면 MailMind가 Claude, GPT, Gemini, Qwen에 전달하고 결과를 이메일로 회신합니다. 앱 불필요. 새 UI 불필요. 이메일만.',
@@ -1196,18 +1110,6 @@ const T = {
     ai_cli_req: 'CLI 설치 및 인증 필요',
     ai_anthropic_desc: 'Claude API 키', ai_openai_desc: 'GPT-4o API 키', ai_gemini_desc: 'Gemini API 키', ai_qwen_desc: 'Qwen API 키', ai_deepseek_desc: 'DeepSeek API 키', ai_copilot_desc: 'GitHub Copilot 토큰',
     ai_groq_desc: 'Groq 고속 추론（Llama）', ai_perplexity_desc: 'Perplexity 검색 증강 AI', ai_cohere_desc: 'Cohere 엔터프라이즈 API', ai_moonshot_desc: '월지암면 Kimi API', ai_glm_desc: '智谱 GLM API', ai_spark_desc: '讯飞 Spark API', ai_ernie_desc: '바이두 Ernie API', ai_yi_desc: '零一万物 Yi API',
-    cmp_label: '왜 다른 도구는 안 될까요?',
-    cmp_title: 'MailMind vs OpenClaw<br/>& 유사 도구',
-    cmp_sub: 'OpenClaw 등 AI 도구는 대부분 브라우저, 전용 앱, 또는 상시 온라인을 요구합니다. MailMind는 이메일을 사용합니다 — 어디서든 동작하는 범용 비동기 인터페이스.',
-    cmp_col_feat: '기능', cmp_col_others: 'OpenClaw / 웹 AI 도구',
-    cmp_r1_feat: '인터페이스', cmp_r1_mm: '이메일 — 새 UI 불필요', cmp_r1_ot: '브라우저 / 전용 앱',
-    cmp_r2_feat: 'AI 백엔드 유연성', cmp_r2_mm: '18개 (CLI & API)', cmp_r2_ot: '보통 하나의 AI에 고정',
-    cmp_r3_feat: '메일박스 연동', cmp_r3_mm: '8개 제공자 + 자동 감지', cmp_r3_ot: '없음',
-    cmp_r4_feat: '예약 자동화', cmp_r4_mm: '✓ 7가지 유형 내장', cmp_r4_ot: '✗ 또는 유료',
-    cmp_r5_feat: '셀프호스트/오프라인', cmp_r5_mm: '✓ 완전 로컬 제어', cmp_r5_ot: '✗ 클라우드 의존',
-    cmp_r6_feat: '첨부 파일', cmp_r6_mm: '✓ 송수신 지원', cmp_r6_ot: '도구마다 다름',
-    cmp_r7_feat: '브라우저 불필요', cmp_r7_mm: '✓ 순수 데몬 프로세스', cmp_r7_ot: '✗ 브라우저/UI 필요',
-    cmp_r8_feat: '오픈소스', cmp_r8_mm: '✓ MIT 라이선스', cmp_r8_ot: '대부분 비공개',
     task_label: '예약 작업', task_title: '정보 수집을 자동화하세요',
     task_p1: '이메일에 자연어로 스케줄을 작성하세요. MailMind가 한국어, 중국어, 일본어, 영어의 시간 표현을 파싱해 자동 실행합니다.',
     task_p2: '결과는 이메일 발송 및/또는 reports/에 타임스탬프로 아카이브됩니다.',
