@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MailMind — 登录</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-box {
+      background: var(--card, #1a1a2e);
+      border: 1px solid var(--border, #333);
+      border-radius: 8px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+    .login-box h1 { font-size: 1.4rem; margin: 0; letter-spacing: .05em; }
+    .login-box input[type=password] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: .6rem .8rem;
+      font-family: inherit;
+      font-size: .95rem;
+      background: var(--bg, #0d0d1a);
+      border: 1px solid var(--border, #333);
+      border-radius: 4px;
+      color: inherit;
+    }
+    .login-box button {
+      width: 100%;
+      padding: .65rem;
+      font-family: inherit;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: var(--accent, #6c63ff);
+      color: #fff;
+    }
+    .login-box button:hover { opacity: .88; }
+    .error-msg {
+      color: #ff6b6b;
+      font-size: .85rem;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h1>MAILMIND</h1>
+    <form method="post" action="/login">
+      <div style="display:flex;flex-direction:column;gap:.8rem;">
+        <input type="password" name="password" placeholder="访问密码" autofocus autocomplete="current-password">
+        {% if error %}
+        <p class="error-msg">{{ error }}</p>
+        {% endif %}
+        <button type="submit">进入</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
