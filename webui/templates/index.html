@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{ ui_lang }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +16,12 @@
 <header>
   <div class="logo">MAILMIND</div>
   {% include "partials/header_status.html" %}
+  <div class="lang-switch">
+    <a href="/lang/zh" class="{{ 'active' if ui_lang == 'zh' else '' }}">中</a>
+    <a href="/lang/ja" class="{{ 'active' if ui_lang == 'ja' else '' }}">日</a>
+    <a href="/lang/ko" class="{{ 'active' if ui_lang == 'ko' else '' }}">한</a>
+    <a href="/lang/en" class="{{ 'active' if ui_lang == 'en' else '' }}">EN</a>
+  </div>
 </header>
 
 <nav>
@@ -23,17 +29,22 @@
           hx-get="/tabs/mail"
           hx-target="#content"
           hx-swap="innerHTML"
-          onclick="setTab(this)">邮件设置</button>
+          onclick="setTab(this)">{{ t.nav_mail }}</button>
   <button class="tab"
           hx-get="/tabs/ai"
           hx-target="#content"
           hx-swap="innerHTML"
-          onclick="setTab(this)">AI 设置</button>
+          onclick="setTab(this)">{{ t.nav_ai }}</button>
+  <button class="tab"
+          hx-get="/tabs/tasks"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          onclick="setTab(this)">{{ t.nav_tasks }}</button>
   <button class="tab"
           hx-get="/tabs/logs"
           hx-target="#content"
           hx-swap="innerHTML"
-          onclick="setTab(this)">日志</button>
+          onclick="setTab(this)">{{ t.nav_logs }}</button>
 </nav>
 
 <main>

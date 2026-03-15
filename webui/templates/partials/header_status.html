@@ -7,13 +7,13 @@
     <span class="hs-text">
       {% if status.running %}
         PID:{{ status.pid }}&nbsp;·&nbsp;{{ status.mailbox }}&nbsp;·&nbsp;{{ status.ai }}&nbsp;·&nbsp;{{ status.mode.upper() }}
-      {% else %}STOPPED{% endif %}
+      {% else %}{{ t.status_stopped }}{% endif %}
     </span>
   </div>
   <div class="hs-actions">
-    <button class="ab" title="启动" hx-post="/daemon/start" hx-target="#header-status" hx-swap="outerHTML">▶</button>
-    <button class="ab" title="停止" hx-post="/daemon/stop" hx-target="#header-status" hx-swap="outerHTML">■</button>
-    <button class="ab" title="重启" hx-post="/daemon/restart" hx-target="#header-status" hx-swap="outerHTML">↺</button>
+    <button class="ab run" title="{{ t.btn_start }}" hx-post="/daemon/start" hx-target="#header-status" hx-swap="outerHTML" {% if status.running %}disabled{% endif %}>▶</button>
+    <button class="ab stop" title="{{ t.btn_stop }}" hx-post="/daemon/stop" hx-target="#header-status" hx-swap="outerHTML" {% if not status.running %}disabled{% endif %}>■</button>
+    <button class="ab" title="{{ t.btn_restart }}" hx-post="/daemon/restart" hx-target="#header-status" hx-swap="outerHTML" {% if not status.running %}disabled{% endif %}>↺</button>
   </div>
   {% if message %}
   <div class="hs-msg {{ 'ok' if success else 'er' }}">{{ message }}</div>

@@ -201,11 +201,12 @@ def parse_ai_response(raw: str):
                 data.get("schedule_at"),
                 data.get("schedule_every"),
                 data.get("schedule_until"),
+                data.get("schedule_cron"),
                 data.get("attachments", []),
                 data.get("task_type"),
                 data.get("task_payload"),
                 data.get("output"),
             )
-        except:
+        except Exception:
             pass
-    return "", raw, None, None, None, [], None, None, None
+    return "", raw, None, None, None, None, [], None, None, None

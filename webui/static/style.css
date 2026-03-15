@@ -106,7 +106,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.1s, color 0.1s;
+  transition: background-color 0.1s, border-color 0.1s, color 0.1s;
   border-radius: 0;
   flex-shrink: 0;
 }
@@ -114,6 +114,36 @@ header {
 .ab:hover {
   border-color: #aaa;
   color: #fff;
+}
+
+.ab.run:not(:disabled) {
+  color: var(--green);
+  border-color: var(--green);
+}
+.ab.run:not(:disabled):hover {
+  background: var(--green);
+  color: var(--header-bg);
+}
+
+.ab.stop:not(:disabled) {
+  color: var(--red);
+  border-color: var(--red);
+}
+.ab.stop:not(:disabled):hover {
+  background: var(--red);
+  color: var(--header-bg);
+}
+
+.ab:disabled {
+  color: #666;
+  border-color: #444;
+  cursor: not-allowed;
+}
+
+.ab:disabled:hover {
+  background: transparent;
+  color: #666;
+  border-color: #444;
 }
 
 .hs-msg {
@@ -372,6 +402,27 @@ details.override > :not(summary) {
   cursor: pointer;
 }
 
+/* ─── Language Switcher ─────────────────────────────────────────────────────── */
+.lang-switch {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.lang-switch a {
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 2px 8px;
+  color: #666;
+  text-decoration: none;
+  border: 1px solid transparent;
+  letter-spacing: 0.04em;
+}
+
+.lang-switch a:hover { color: #ccc; }
+.lang-switch a.active { color: #f0f0f0; border-color: #555; }
+
 /* ─── Section Divider ───────────────────────────────────────────────────────── */
 .section-title {
   font-size: 10px;
@@ -452,6 +503,112 @@ details.override > :not(summary) {
 #log-wrap::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+/* ─── Tasks Tab ─────────────────────────────────────────────────────────────── */
+.tasks-filter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tasks-filter .filter-btn {
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.tasks-filter .filter-btn.active {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.tasks-table-wrap {
+  overflow-x: auto;
+}
+
+.tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tasks-table th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.tasks-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.tasks-table tr:last-child td {
+  border-bottom: none;
+}
+
+.tasks-table tr:hover td {
+  background: rgba(0,0,0,0.02);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-pending    { background: #fef9c3; color: #854d0e; }
+.badge-processing { background: #dbeafe; color: #1e40af; }
+.badge-completed  { background: #dcfce7; color: #166534; }
+.badge-failed     { background: #fee2e2; color: #991b1b; }
+
+.badge-email       { background: #f3f4f6; color: #374151; }
+.badge-weather     { background: #dbeafe; color: #1e40af; }
+.badge-news        { background: #ede9fe; color: #5b21b6; }
+.badge-ai_job      { background: #fef3c7; color: #92400e; }
+.badge-web_search  { background: #ecfdf5; color: #065f46; }
+.badge-report      { background: #fce7f3; color: #9d174d; }
+.badge-system_status { background: #f0fdf4; color: #14532d; }
+
+.btn-sm {
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--fg);
+}
+
+.btn-sm:hover { background: var(--fg); color: var(--bg); }
+
+.btn-sm.danger { color: var(--red); border-color: var(--red); }
+.btn-sm.danger:hover { background: var(--red); color: #fff; border-color: var(--red); }
+
+.task-actions { display: flex; gap: 6px; }
+
+.task-subject { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-to      { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.task-repeat  { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.tasks-empty  { padding: 32px; text-align: center; color: var(--muted); font-size: 12px; }
 
 /* ─── Select arrow ──────────────────────────────────────────────────────────── */
 select {

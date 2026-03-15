@@ -1,7 +1,7 @@
 <div class="tab-body">
   <div class="log-header">
-    <span class="log-title">DAEMON LOG</span>
-    <button class="btn-sm" onclick="document.getElementById('log-content').innerHTML=''">清空显示</button>
+    <span class="log-title">{{ t.logs_title }}</span>
+    <button class="btn-sm" onclick="document.getElementById('log-content').innerHTML=''">{{ t.logs_clear }}</button>
   </div>
   <div id="log-wrap" hx-ext="sse" sse-connect="/logs/stream">
     <div id="log-content" sse-swap="message" hx-swap="beforeend">

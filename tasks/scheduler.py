@@ -30,6 +30,7 @@ class TaskScheduler:
                     trigger_time REAL,
                     interval_seconds INTEGER,
                     until_time REAL,
+                    cron_expr TEXT,
                     type TEXT,
                     payload TEXT,
                     output TEXT,
@@ -38,12 +39,27 @@ class TaskScheduler:
                     status TEXT DEFAULT 'pending'
                 )
             """)
+            # Migration: add cron_expr column to existing databases
+            try:
+                conn.execute("ALTER TABLE tasks ADD COLUMN cron_expr TEXT")
+            except Exception:
+                pass  # Column already exists
 
     def _parse_datetime(self, value: str):
         if not value: return None
         try:
             return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
         except Exception:
+            return None
+
+    def _cron_next(self, cron_expr: str, after: float = None) -> Optional[float]:
+        """Calculate next trigger time for a cron expression using croniter."""
+        try:
+            from croniter import croniter
+            base = datetime.fromtimestamp(after or time.time())
+            return croniter(cron_expr, base).get_next(float)
+        except Exception as e:
+            log.error(f"cron 表达式解析失败 '{cron_expr}': {e}")
             return None
 
     def _parse_duration(self, value: str):
@@ -65,6 +81,7 @@ class TaskScheduler:
         schedule_at: str = None,
         schedule_every: str = None,
         schedule_until: str = None,
+        schedule_cron: str = None,
         task_type: str = "email",
         task_payload: Optional[dict] = None,
         output: Optional[dict] = None,
@@ -74,8 +91,11 @@ class TaskScheduler:
         try:
             interval = self._parse_duration(schedule_every)
             until_ts = self._parse_datetime(schedule_until)
+            cron_expr = schedule_cron or None
 
-            if schedule_at:
+            if cron_expr:
+                trigger_time = self._cron_next(cron_expr)
+            elif schedule_at:
                 if isinstance(schedule_at, str) and schedule_at.isdigit():
                     trigger_time = time.time() + int(schedule_at)
                 else:
@@ -84,14 +104,14 @@ class TaskScheduler:
                 trigger_time = time.time()
 
             if trigger_time is None:
-                raise ValueError("schedule_at 无法解析")
-            
+                raise ValueError("schedule_at/schedule_cron 无法解析")
+
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute("""
-                    INSERT INTO tasks (mailbox_name, "to", subject, body, trigger_time, interval_seconds, until_time, type, payload, output, attachments, in_reply_to)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO tasks (mailbox_name, "to", subject, body, trigger_time, interval_seconds, until_time, cron_expr, type, payload, output, attachments, in_reply_to)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    mailbox_name, to, subject, body, trigger_time, interval, until_ts,
+                    mailbox_name, to, subject, body, trigger_time, interval, until_ts, cron_expr,
                     task_type or "email", json.dumps(task_payload or {}),
                     json.dumps(output or {}), json.dumps(attachments or []), in_reply_to
                 ))
@@ -119,11 +139,19 @@ class TaskScheduler:
 
                         try:
                             self._execute_single_task(task_dict)
-                            
+
+                            cron_expr = task_dict.get("cron_expr")
                             interval = task_dict.get("interval_seconds")
-                            if interval:
+                            until_time = task_dict.get("until_time")
+
+                            if cron_expr:
+                                next_time = self._cron_next(cron_expr, after=time.time())
+                                if next_time and (not until_time or next_time <= until_time):
+                                    conn.execute("UPDATE tasks SET trigger_time = ?, status = 'pending' WHERE id = ?", (next_time, task_dict['id']))
+                                else:
+                                    conn.execute("UPDATE tasks SET status = 'completed' WHERE id = ?", (task_dict['id'],))
+                            elif interval:
                                 next_time = time.time() + interval
-                                until_time = task_dict.get("until_time")
                                 if not until_time or next_time <= until_time:
                                     conn.execute("UPDATE tasks SET trigger_time = ?, status = 'pending' WHERE id = ?", (next_time, task_dict['id']))
                                 else:

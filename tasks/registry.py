@@ -3,11 +3,40 @@ import shutil
 import time
 import subprocess
 import logging
+import requests
 from typing import Optional
-from core.config import WEATHER_DEFAULT_LOCATION, SEARCH_RESULTS_COUNT, AI_BACKENDS, DEFAULT_TASK_AI
+from core.config import WEATHER_API_KEY, WEATHER_DEFAULT_LOCATION, SEARCH_RESULTS_COUNT, AI_BACKENDS, DEFAULT_TASK_AI
 from utils.search import web_search, format_search_results
 from ai.providers import get_ai_provider
 from utils.logger import log
+
+
+def fetch_weather_data(location: str) -> Optional[str]:
+    """WeatherAPI.com で天気を取得し、整形テキストを返す。失敗時は None。"""
+    if not WEATHER_API_KEY:
+        return None
+    try:
+        resp = requests.get(
+            "https://api.weatherapi.com/v1/current.json",
+            params={"key": WEATHER_API_KEY, "q": location, "lang": "zh"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        d = resp.json()
+        loc = d["location"]
+        cur = d["current"]
+        return (
+            f"地点：{loc['name']}，{loc['country']}\n"
+            f"时间：{loc['localtime']}\n"
+            f"天气：{cur['condition']['text']}\n"
+            f"温度：{cur['temp_c']}°C（体感 {cur['feelslike_c']}°C）\n"
+            f"湿度：{cur['humidity']}%\n"
+            f"风速：{cur['wind_kph']} km/h {cur['wind_dir']}\n"
+            f"能见度：{cur['vis_km']} km"
+        )
+    except Exception as e:
+        log.warning(f"WeatherAPI 查询失败：{e}")
+        return None
 
 def _read_meminfo_kb() -> dict:
     info = {}
@@ -108,7 +137,12 @@ def execute_task_logic(task: dict):
         loc = payload.get("location") or WEATHER_DEFAULT_LOCATION
         ai_name, backend = pick_task_ai(payload)
         ai = get_ai_provider(ai_name, backend)
-        body = ai.call(f"请搜索并告诉我现在 {loc} 的天气情况，包括温度和天气现象。")
+        weather_data = fetch_weather_data(loc)
+        if weather_data:
+            prompt = f"以下是 {loc} 的实时天气数据，请用自然语言整理成简洁的天气播报：\n\n{weather_data}"
+        else:
+            prompt = f"请搜索并告诉我现在 {loc} 的天气情况，包括温度和天气现象。"
+        body = ai.call(prompt)
         subject = subject or f"天气更新：{loc}"
     elif task_type == "news":
         ai_name, backend = pick_task_ai(payload)

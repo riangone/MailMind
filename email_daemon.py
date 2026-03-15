@@ -12,9 +12,9 @@ import threading
 from typing import Optional
 
 # 核心配置与模块
-from core.config import MAILBOXES, AI_BACKENDS, POLL_INTERVAL, DEFAULT_TASK_AI, PROMPT_TEMPLATE
+from core.config import MAILBOXES, AI_BACKENDS, POLL_INTERVAL, DEFAULT_TASK_AI, PROMPT_TEMPLATE, AI_CONCURRENCY
 from core.validator import validate_config
-from core.mail_client import fetch_unread_emails, imap_login, get_oauth_token, fetch_message_content_by_id
+from core.mail_client import fetch_unread_emails, imap_login, get_oauth_token, fetch_thread_context
 from core.mail_sender import send_reply, archive_output
 from ai.providers import get_ai_provider
 from utils.parser import parse_ai_response, auto_detect_tasks
@@ -23,8 +23,9 @@ from tasks.scheduler import scheduler
 from tasks.registry import execute_task_logic
 from concurrent.futures import ThreadPoolExecutor
 
-# 初始化线程池
+# 初始化线程池与 AI 并发限速器
 executor = ThreadPoolExecutor(max_workers=5)
+_ai_semaphore = threading.Semaphore(AI_CONCURRENCY)
 
 # 已处理 ID 路径
 PROCESSED_IDS_PATH: Optional[str] = None
@@ -57,28 +58,33 @@ def save_processed_ids(path: str, ids: set):
 def call_ai(ai_name: str, backend: dict, instruction: str):
     prompt = PROMPT_TEMPLATE.format(instruction=instruction)
     ai = get_ai_provider(ai_name, backend)
-    raw = ai.call(prompt)
+    with _ai_semaphore:
+        raw = ai.call(prompt)
     return parse_ai_response(raw)
 
 def process_email(mailbox_name, ai_name, backend, em):
     log.info(f"📨 收到指令: [{em['subject']}] 来自 {em['from_email']}")
-    
-    # 尝试获取会话上下文
+
+    # 获取完整会话线索（多层上下文）
     context_msg = ""
-    if em.get("in_reply_to"):
-        log.info(f"🔍 检测到回复，正在获取上下文: {em['in_reply_to']}")
-        context_msg = fetch_message_content_by_id(MAILBOXES[mailbox_name], em["in_reply_to"])
-    
+    if em.get("in_reply_to") or em.get("references"):
+        log.info(f"🔍 检测到回复，正在获取会话上下文（最多 {em.get('references', '').count(' ') + 1} 条）")
+        context_msg = fetch_thread_context(
+            MAILBOXES[mailbox_name],
+            em.get("references", ""),
+            em.get("in_reply_to", ""),
+        )
+
     instr = f"发件人：{em['from']}\n主题：{em['subject']}\n\n"
     if context_msg:
-        instr += f"--- 上下文（上一封邮件内容） ---\n{context_msg}\n\n--- 当前邮件内容 ---\n"
-    
+        instr += f"--- 会话历史（从早到晚）---\n{context_msg}\n\n--- 当前邮件内容 ---\n"
+
     instr += em['body']
     for att in em.get("attachments", []):
         if att["is_text"]: instr += f"\n\n--- 附件：{att['filename']} ---\n{att['content']}"
-    
-    sub, body, sch_at, sch_every, sch_until, atts, task_type, task_payload, output = call_ai(ai_name, backend, instr)
-    
+
+    sub, body, sch_at, sch_every, sch_until, sch_cron, atts, task_type, task_payload, output = call_ai(ai_name, backend, instr)
+
     if not task_type:
         detected_tasks = auto_detect_tasks(em["body"] or "")
         if detected_tasks:
@@ -91,8 +97,8 @@ def process_email(mailbox_name, ai_name, backend, em):
             if not sch_until and det.get("schedule_until"): sch_until = det.get("schedule_until")
 
     sub = sub or (em["subject"] if em["subject"].startswith("Re:") else f"Re: {em['subject']}")
-    
-    if sch_at or sch_every:
+
+    if sch_cron or sch_at or sch_every:
         if task_type and not output:
             output = {"email": True, "archive": True, "archive_dir": "reports"}
         scheduler.add_task(
@@ -103,13 +109,17 @@ def process_email(mailbox_name, ai_name, backend, em):
             sch_at,
             sch_every,
             sch_until,
+            sch_cron,
             task_type or "email",
             task_payload or {},
             output or {},
             atts,
             in_reply_to=em.get("message_id", "")
         )
-        if sch_every:
+        if sch_cron:
+            msg = f"您的任务已按 cron 表达式 [{sch_cron}] 调度，截止至 {sch_until or '未指定'}。\n\n内容预览：\n{body}"
+            send_reply(MAILBOXES[mailbox_name], em["from_email"], f"已安排定时任务：{sub}", msg)
+        elif sch_every:
             msg = f"您的任务将每 {sch_every} 发送一次，截止至 {sch_until or '未指定'}。\n\n内容预览：\n{body}"
             send_reply(MAILBOXES[mailbox_name], em["from_email"], f"已安排定时任务：{sub}", msg)
         else:

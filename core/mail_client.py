@@ -6,7 +6,7 @@ import logging
 import base64
 from email.header import decode_header as _decode_header
 from email.utils import parseaddr
-from core.config import MAILBOXES
+from core.config import MAILBOXES, ATTACHMENT_MAX_SIZE_MB, CONTEXT_MAX_DEPTH
 from utils.logger import log
 
 def _oauth_google(mailbox: dict) -> str:
@@ -70,6 +70,7 @@ def decode_str(s: str) -> str:
     return "".join(result)
 
 def get_body_and_attachments(msg) -> tuple:
+    max_bytes = ATTACHMENT_MAX_SIZE_MB * 1024 * 1024
     body, attachments = "", []
     if msg.is_multipart():
         for part in msg.walk():
@@ -77,6 +78,10 @@ def get_body_and_attachments(msg) -> tuple:
             if "attachment" in disposition:
                 payload = part.get_payload(decode=True)
                 if payload:
+                    if len(payload) > max_bytes:
+                        filename = decode_str(part.get_filename() or "untitled")
+                        log.warning(f"附件 '{filename}' 超出大小限制 ({len(payload)//1024}KB > {ATTACHMENT_MAX_SIZE_MB}MB)，已跳过")
+                        continue
                     is_text = part.get_content_type().startswith("text/")
                     content = payload.decode(part.get_content_charset() or "utf-8", errors="replace") if is_text else payload
                     attachments.append({"filename": decode_str(part.get_filename() or "untitled"), "content": content, "is_text": is_text})
@@ -184,7 +189,6 @@ def fetch_message_content_by_id(mailbox: dict, message_id: str) -> str:
     mail = imap_login(mailbox)
     content = ""
     try:
-        # 尝试在收件箱和已发送中查找
         for folder in ["INBOX", '"[Gmail]/Sent Mail"', "Sent"]:
             try:
                 status, _ = mail.select(folder, readonly=True)
@@ -202,3 +206,56 @@ def fetch_message_content_by_id(mailbox: dict, message_id: str) -> str:
     finally:
         mail.logout()
     return content
+
+def fetch_thread_context(mailbox: dict, references: str, in_reply_to: str = "", max_depth: int = None) -> str:
+    """获取完整会话线索（多层上下文），复用单次 IMAP 连接"""
+    if max_depth is None:
+        max_depth = CONTEXT_MAX_DEPTH
+
+    # Collect all referenced message IDs (References header is space-separated)
+    ref_ids: list[str] = []
+    if references:
+        ref_ids = [mid.strip() for mid in references.split() if mid.strip()]
+    if in_reply_to and in_reply_to.strip() and in_reply_to.strip() not in ref_ids:
+        ref_ids.append(in_reply_to.strip())
+    if not ref_ids:
+        return ""
+
+    # Take the most recent max_depth IDs; preserve original order for output
+    ref_ids = ref_ids[-max_depth:]
+    needed = set(ref_ids)
+    results: dict[str, str] = {}
+
+    try:
+        mail = imap_login(mailbox)
+        for folder in ["INBOX", '"[Gmail]/Sent Mail"', "Sent", '"Sent Messages"']:
+            remaining = needed - set(results.keys())
+            if not remaining:
+                break
+            try:
+                status, _ = mail.select(folder, readonly=True)
+                if status != "OK":
+                    continue
+                for mid in list(remaining):
+                    try:
+                        _, data = mail.search(None, f'HEADER Message-ID "{mid}"')
+                        ids = data[0].split()
+                        if ids:
+                            _, msg_data = mail.fetch(ids[0], "(RFC822)")
+                            msg = email.message_from_bytes(msg_data[0][1])
+                            body, _ = get_body_and_attachments(msg)
+                            if body:
+                                results[mid] = body
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        mail.logout()
+    except Exception as e:
+        log.warning(f"获取会话上下文失败: {e}")
+
+    if not results:
+        return ""
+
+    parts = [results[mid] for mid in ref_ids if mid in results]
+    return "\n\n---\n\n".join(parts)

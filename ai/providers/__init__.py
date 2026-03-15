@@ -17,7 +17,7 @@ class CLIProvider(AIBase):
                 for key in ["TAVILY_API_KEY", "GOOGLE_API_KEY", "GOOGLE_SEARCH_ENGINE_ID"]:
                     val = os.environ.get(key, "")
                     if val: env[key] = val
-            
+
             return subprocess.run(
                 [self.backend["cmd"]] + self.backend["args"] + [prompt],
                 capture_output=True,
@@ -26,8 +26,8 @@ class CLIProvider(AIBase):
                 env=env
             ).stdout.strip()
         except Exception as e:
-            log.error(f"CLI AI 调用失败: {e}")
-            return f"AI 出错: {e}"
+            log.error(f"CLI AI 调用失败：{e}")
+            return f"AI 出错：{e}"
 
 class OpenAIProvider(AIBase):
     def __init__(self, backend: dict):
@@ -42,8 +42,8 @@ class OpenAIProvider(AIBase):
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            log.error(f"OpenAI API 调用失败: {e}")
-            return f"AI 出错: {e}"
+            log.error(f"OpenAI API 调用失败：{e}")
+            return f"AI 出错：{e}"
 
 class AnthropicProvider(AIBase):
     def __init__(self, backend: dict):
@@ -57,8 +57,8 @@ class AnthropicProvider(AIBase):
             resp.raise_for_status()
             return resp.json()["content"][0]["text"].strip()
         except Exception as e:
-            log.error(f"Anthropic API 调用失败: {e}")
-            return f"AI 出错: {e}"
+            log.error(f"Anthropic API 调用失败：{e}")
+            return f"AI 出错：{e}"
 
 class GeminiAPIProvider(AIBase):
     def __init__(self, backend: dict):
@@ -72,8 +72,8 @@ class GeminiAPIProvider(AIBase):
             resp.raise_for_status()
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except Exception as e:
-            log.error(f"Gemini API 调用失败: {e}")
-            return f"AI 出错: {e}"
+            log.error(f"Gemini API 调用失败：{e}")
+            return f"AI 出错：{e}"
 
 class QwenAPIProvider(AIBase):
     def __init__(self, backend: dict):
@@ -87,8 +87,106 @@ class QwenAPIProvider(AIBase):
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            log.error(f"Qwen API 调用失败: {e}")
-            return f"AI 出错: {e}"
+            log.error(f"Qwen API 调用失败：{e}")
+            return f"AI 出错：{e}"
+
+
+class CohereProvider(AIBase):
+    """Cohere API 提供商（支持 Command 系列模型）"""
+    def __init__(self, backend: dict):
+        self.backend = backend
+
+    def call(self, prompt: str) -> str:
+        try:
+            headers = {"Authorization": f"Bearer {self.backend['api_key']}", "Content-Type": "application/json"}
+            data = {
+                "model": self.backend["model"],
+                "message": prompt,
+                "max_tokens": 4096
+            }
+            resp = requests.post("https://api.cohere.ai/v2/chat", json=data, headers=headers, timeout=180)
+            resp.raise_for_status()
+            return resp.json()["message"]["content"][0]["text"].strip()
+        except Exception as e:
+            log.error(f"Cohere API 调用失败：{e}")
+            return f"AI 出错：{e}"
+
+
+class SparkAPIProvider(AIBase):
+    """讯飞星火 API 提供商（使用 OpenAI 兼容格式）"""
+    def __init__(self, backend: dict):
+        self.backend = backend
+        self.api_key = self.backend.get("api_key", "")
+
+    def call(self, prompt: str) -> str:
+        try:
+            headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+            data = {"model": self.backend["model"], "messages": [{"role": "user", "content": prompt}]}
+            resp = requests.post(
+                "https://spark-api-open.xf-yun.com/v1/chat/completions",
+                json=data, headers=headers, timeout=180
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            log.error(f"讯飞星火 API 调用失败：{e}")
+            return f"AI 出错：{e}"
+
+
+class ErnieAPIProvider(AIBase):
+    """百度文心一言 API 提供商"""
+    def __init__(self, backend: dict):
+        self.backend = backend
+        self.api_key = self.backend.get("api_key", "")
+        self._access_token = None
+        self._token_expiry = 0
+
+    def _get_access_token(self) -> str:
+        import time
+        if self._access_token and time.time() < self._token_expiry:
+            return self._access_token
+        
+        if ":" in self.api_key:
+            api_key, secret_key = self.api_key.split(":", 1)
+        else:
+            return self.api_key
+        
+        try:
+            resp = requests.post(
+                "https://aip.baidubce.com/oauth/2.0/token",
+                params={"grant_type": "client_credentials", "client_id": api_key, "client_secret": secret_key},
+                timeout=30
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            self._access_token = data["access_token"]
+            self._token_expiry = time.time() + data.get("expires_in", 2592000) - 600
+            return self._access_token
+        except Exception as e:
+            log.error(f"获取文心一言 access_token 失败：{e}")
+            return ""
+
+    def call(self, prompt: str) -> str:
+        try:
+            access_token = self._get_access_token()
+            if not access_token:
+                return "AI 出错：无法获取 access_token"
+            
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "messages": [{"role": "user", "content": prompt}],
+                "max_output_tokens": 4096
+            }
+            resp = requests.post(
+                f"https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/{self.backend['model']}?access_token={access_token}",
+                json=data, headers=headers, timeout=180
+            )
+            resp.raise_for_status()
+            return resp.json()["result"].strip()
+        except Exception as e:
+            log.error(f"文心一言 API 调用失败：{e}")
+            return f"AI 出错：{e}"
+
 
 def get_ai_provider(ai_name: str, backend: dict) -> AIBase:
     t = backend["type"]
@@ -97,4 +195,7 @@ def get_ai_provider(ai_name: str, backend: dict) -> AIBase:
     if t == "api_anthropic": return AnthropicProvider(backend)
     if t == "api_gemini": return GeminiAPIProvider(backend)
     if t == "api_qwen": return QwenAPIProvider(backend)
-    raise ValueError(f"未知 AI 类型: {t}")
+    if t == "api_cohere": return CohereProvider(backend)
+    if t == "api_spark": return SparkAPIProvider(backend)
+    if t == "api_ernie": return ErnieAPIProvider(backend)
+    raise ValueError(f"未知 AI 类型：{t}")

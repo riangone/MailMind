@@ -1,0 +1,119 @@
+<div class="tab-body">
+
+  {% if feedback %}
+  <div class="feedback {{ 'ok' if feedback.ok else 'err' }}">
+    {{ feedback.message }}
+  </div>
+  {% endif %}
+
+  <!-- ── Filters ─────────────────────────────────────────────── -->
+  <div class="tasks-filter">
+    <button class="filter-btn {{ 'active' if status_filter == 'all' else '' }}"
+            hx-get="/tabs/tasks?status=all"
+            hx-target="#content"
+            hx-swap="innerHTML">{{ t.tasks_filter_all }}</button>
+    <button class="filter-btn {{ 'active' if status_filter == 'pending' else '' }}"
+            hx-get="/tabs/tasks?status=pending"
+            hx-target="#content"
+            hx-swap="innerHTML">{{ t.tasks_filter_pending }}</button>
+    <button class="filter-btn {{ 'active' if status_filter == 'completed' else '' }}"
+            hx-get="/tabs/tasks?status=completed"
+            hx-target="#content"
+            hx-swap="innerHTML">{{ t.tasks_filter_completed }}</button>
+    <button class="filter-btn {{ 'active' if status_filter == 'failed' else '' }}"
+            hx-get="/tabs/tasks?status=failed"
+            hx-target="#content"
+            hx-swap="innerHTML">{{ t.tasks_filter_failed }}</button>
+    <button class="filter-btn"
+            hx-get="/tabs/tasks?status={{ status_filter }}"
+            hx-target="#content"
+            hx-swap="innerHTML"
+            style="margin-left: auto">{{ t.tasks_refresh }}</button>
+  </div>
+
+  <!-- ── Task list ────────────────────────────────────────────── -->
+  {% if tasks %}
+  <div class="tasks-table-wrap">
+    <table class="tasks-table">
+      <thead>
+        <tr>
+          <th>{{ t.tasks_col_id }}</th>
+          <th>{{ t.tasks_col_subject }}</th>
+          <th>{{ t.tasks_col_type }}</th>
+          <th>{{ t.tasks_col_next }}</th>
+          <th>{{ t.tasks_col_repeat }}</th>
+          <th>{{ t.tasks_col_status }}</th>
+          <th>{{ t.tasks_col_to }}</th>
+          <th>{{ t.tasks_col_actions }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for task in tasks %}
+        <tr>
+          <td style="color: var(--muted)">{{ task.id }}</td>
+
+          <td>
+            <div class="task-subject" title="{{ task.subject }}">{{ task.subject }}</div>
+          </td>
+
+          <td>
+            <span class="badge badge-{{ task.type or 'email' }}">{{ task.type or 'email' }}</span>
+          </td>
+
+          <td style="white-space: nowrap">
+            {% if task.trigger_time %}
+              {{ task.trigger_time | fmt_ts }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
+          <td class="task-repeat">
+            {% if task.cron_expr %}
+              <span title="cron">⏱ {{ task.cron_expr }}</span>
+            {% elif task.interval_seconds %}
+              {% set s = task.interval_seconds | int %}
+              {% if s % 86400 == 0 %}{{ t.tasks_repeat_every }} {{ s // 86400 }}d
+              {% elif s % 3600 == 0 %}{{ t.tasks_repeat_every }} {{ s // 3600 }}h
+              {% elif s % 60 == 0 %}{{ t.tasks_repeat_every }} {{ s // 60 }}m
+              {% else %}{{ t.tasks_repeat_every }} {{ s }}s
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
+          <td>
+            <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
+          </td>
+
+          <td>
+            <div class="task-to" title="{{ task.to }}">{{ task.to }}</div>
+          </td>
+
+          <td>
+            <div class="task-actions">
+              {% if task.status in ('pending', 'failed', 'completed') %}
+              <button class="btn-sm"
+                      hx-post="/tasks/{{ task.id }}/trigger"
+                      hx-target="#content"
+                      hx-swap="innerHTML"
+                      hx-confirm="{{ t.tasks_confirm_trigger }}">{{ t.tasks_btn_trigger }}</button>
+              {% endif %}
+              <button class="btn-sm danger"
+                      hx-post="/tasks/{{ task.id }}/delete"
+                      hx-target="#content"
+                      hx-swap="innerHTML"
+                      hx-confirm="{{ t.tasks_confirm_delete }}">{{ t.tasks_btn_delete }}</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="tasks-empty">{{ t.tasks_empty }}</div>
+  {% endif %}
+
+</div>

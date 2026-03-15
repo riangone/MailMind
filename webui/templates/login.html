@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{ ui_lang }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MailMind — 登录</title>
+  <title>MailMind</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -11,8 +11,8 @@
   <style>
     body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     .login-box {
-      background: var(--card, #1a1a2e);
-      border: 1px solid var(--border, #333);
+      background: var(--bg, #fafafa);
+      border: 1px solid var(--border, #ddd);
       border-radius: 8px;
       padding: 2.5rem 2rem;
       width: 100%;
@@ -21,7 +21,7 @@
       flex-direction: column;
       gap: 1.2rem;
     }
-    .login-box h1 { font-size: 1.4rem; margin: 0; letter-spacing: .05em; }
+    .login-box h1 { font-size: 1.4rem; margin: 0; letter-spacing: .05em; color: var(--fg, #0f0f0f); }
     .login-box input[type=password] {
       width: 100%;
       box-sizing: border-box;
@@ -51,6 +51,9 @@
       font-size: .85rem;
       margin: 0;
     }
+    .login-lang { text-align: center; font-size: .8rem; }
+    .login-lang a { color: var(--muted, #888); text-decoration: none; margin: 0 .3rem; }
+    .login-lang a:hover { color: var(--accent, #6c63ff); }
   </style>
 </head>
 <body>
@@ -58,13 +61,16 @@
     <h1>MAILMIND</h1>
     <form method="post" action="/login">
       <div style="display:flex;flex-direction:column;gap:.8rem;">
-        <input type="password" name="password" placeholder="访问密码" autofocus autocomplete="current-password">
+        <input type="password" name="password" placeholder="{{ t.login_placeholder }}" autofocus autocomplete="current-password">
         {% if error %}
         <p class="error-msg">{{ error }}</p>
         {% endif %}
-        <button type="submit">进入</button>
+        <button type="submit">{{ t.login_btn }}</button>
       </div>
     </form>
+    <div class="login-lang">
+      <a href="/lang/zh">中文</a>·<a href="/lang/ja">日本語</a>·<a href="/lang/ko">한국어</a>·<a href="/lang/en">English</a>
+    </div>
   </div>
 </body>
 </html>
