@@ -487,8 +487,11 @@
 
     /* ── Responsive ── */
     @media (max-width: 900px) {
-      nav { padding: 14px 20px; }
+      nav { padding: 12px 16px; gap: 10px; }
       .nav-links { display: none; }
+      .nav-cta { display: none; }
+      .nav-controls { gap: 8px; }
+      .lang-btn { padding: 4px 6px; font-size: 0.6rem; }
       #features, #ai, #start, #cta, #tasks, #compare { padding: 60px 20px; }
       #how, #mailboxes { padding: 60px 20px; }
       .steps { grid-template-columns: 1fr; gap: 30px; }
@@ -496,7 +499,6 @@
       .tasks-inner, .start-inner { grid-template-columns: 1fr; gap: 36px; }
       .stats-bar { grid-template-columns: repeat(2, 1fr); }
       footer { flex-direction: column; text-align: center; }
-      .lang-switcher { display: none; }
     }
   </style>
 </head>
