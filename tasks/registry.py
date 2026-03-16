@@ -206,6 +206,9 @@ def execute_task_logic(task: dict):
         else:
             body = report_text
             subject = subject or "日报"
+    elif task_type == "email_manage":
+        # email_manage is handled interactively in process_email(); scheduled runs are not supported.
+        body = "⚠️ email_manage 仅支持即时执行，不支持定时任务。"
     else:
         body = f"⚠️ 未知任务类型：{task_type}"
 

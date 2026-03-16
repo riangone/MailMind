@@ -1,6 +1,7 @@
 import imaplib
 import email
 import os
+import re
 import json
 import logging
 import base64
@@ -112,6 +113,133 @@ _FOLDER_NAMES = {
     "ja": "MailMindテンプレート",
     "en": "MailMind Templates",
 }
+
+def list_imap_folders(mailbox: dict) -> list:
+    """Return list of all folder names in the mailbox."""
+    mail = imap_login(mailbox)
+    try:
+        _, folder_list = mail.list()
+        folders = []
+        for item in folder_list:
+            if not item:
+                continue
+            decoded = item.decode() if isinstance(item, bytes) else item
+            m = re.search(r'"/" (?:"([^"]+)"|(\S+))$', decoded)
+            if m:
+                folders.append((m.group(1) or m.group(2)).strip())
+        return folders
+    except Exception as e:
+        log.warning(f"获取文件夹列表失败：{e}")
+        return ["INBOX"]
+    finally:
+        mail.logout()
+
+
+def fetch_email_headers_all(mailbox: dict, folders: list = None) -> list:
+    """Fetch email headers (uid, folder, from, subject, date, flags) from given folders.
+    Returns list of header dicts. Fetches up to 500 per folder."""
+    if folders is None:
+        folders = ["INBOX"]
+
+    mail = imap_login(mailbox)
+    results = []
+    try:
+        for folder in folders:
+            try:
+                status, _ = mail.select(folder, readonly=True)
+                if status != "OK":
+                    continue
+                _, data = mail.uid("search", None, "ALL")
+                uids = data[0].split()
+                if not uids:
+                    continue
+                uids = uids[:500]  # cap per folder
+                # Fetch in batches of 50
+                for i in range(0, len(uids), 50):
+                    batch = b",".join(uids[i:i + 50])
+                    _, fetch_data = mail.uid("fetch", batch, "(RFC822.HEADER FLAGS)")
+                    for item in fetch_data:
+                        if not isinstance(item, tuple):
+                            continue
+                        meta = item[0].decode()
+                        uid_m = re.search(r"UID (\d+)", meta)
+                        if not uid_m:
+                            continue
+                        uid = uid_m.group(1)
+                        flags_m = re.search(r"FLAGS \(([^)]*)\)", meta)
+                        flags = flags_m.group(1) if flags_m else ""
+                        msg = email.message_from_bytes(item[1])
+                        from_raw = decode_str(msg.get("From", ""))
+                        from_email_addr = parseaddr(from_raw)[1].strip()
+                        results.append({
+                            "uid": uid,
+                            "folder": folder,
+                            "from_email": from_email_addr,
+                            "from": from_raw,
+                            "subject": decode_str(msg.get("Subject", "(无主题)")),
+                            "date": msg.get("Date", ""),
+                            "flags": flags,
+                            "message_id": msg.get("Message-ID", ""),
+                        })
+            except Exception as e:
+                log.warning(f"获取文件夹 '{folder}' 邮件头失败：{e}")
+    finally:
+        mail.logout()
+    return results
+
+
+def imap_move_messages(mail, uid_list: list, target_folder: str) -> int:
+    """Move UIDs to target_folder. Returns count of successfully moved messages.
+    Caller must have already selected the source folder (read-write)."""
+    if not uid_list:
+        return 0
+    success = 0
+    # Create destination folder if needed
+    try:
+        mail.create(target_folder)
+    except Exception:
+        pass
+    for uid in uid_list:
+        try:
+            rv, _ = mail.uid("copy", uid, target_folder)
+            if rv == "OK":
+                mail.uid("store", uid, "+FLAGS", "\\Deleted")
+                success += 1
+        except Exception as e:
+            log.warning(f"移动 uid={uid} 失败：{e}")
+    mail.expunge()
+    return success
+
+
+def imap_delete_messages(mail, uid_list: list) -> int:
+    """Mark UIDs as \\Deleted and expunge. Returns count deleted."""
+    if not uid_list:
+        return 0
+    success = 0
+    for uid in uid_list:
+        try:
+            mail.uid("store", uid, "+FLAGS", "\\Deleted")
+            success += 1
+        except Exception as e:
+            log.warning(f"删除 uid={uid} 失败：{e}")
+    mail.expunge()
+    return success
+
+
+def imap_set_flag(mail, uid_list: list, flag: str, add: bool = True) -> int:
+    """Add or remove an IMAP flag on uid_list. Returns count affected."""
+    if not uid_list:
+        return 0
+    op = "+FLAGS" if add else "-FLAGS"
+    success = 0
+    for uid in uid_list:
+        try:
+            mail.uid("store", uid, op, flag)
+            success += 1
+        except Exception as e:
+            log.warning(f"设置标记 {flag} uid={uid} 失败：{e}")
+    return success
+
 
 def push_templates_to_mailbox(mailbox: dict, lang: str = "zh") -> int:
     """通过 IMAP APPEND 将模板邮件写入邮箱专属文件夹，返回成功写入数量。"""

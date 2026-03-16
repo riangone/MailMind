@@ -10,6 +10,7 @@ import re
 import json
 import argparse
 import threading
+from datetime import datetime
 from typing import Optional
 
 # 核心配置与模块
@@ -236,7 +237,6 @@ def save_processed_ids(path: str, ids: set):
 # ────────────────────────────────────────────────────────────────
 
 def call_ai(ai_name: str, backend: dict, instruction: str):
-    from datetime import datetime
     now = datetime.now().strftime("%Y-%m-%d %H:%M (%Z)")
     prompt = PROMPT_TEMPLATE.format(instruction=instruction, now=now)
     ai = get_ai_provider(ai_name, backend)
@@ -255,6 +255,31 @@ def process_email(mailbox_name, ai_name, backend, em):
         processed_ids.add(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
         return
+
+    # email_manage 确认回复检测
+    if em.get("in_reply_to"):
+        from core.email_manager import get_pending_op, pop_pending_op, execute_email_manage_op
+        pending_op = get_pending_op(em["in_reply_to"])
+        if pending_op:
+            body_lower = (em.get("body") or "").strip().lower()
+            _CONFIRM = {"确认执行", "确认", "执行", "confirm", "yes", "ok", "確認実行", "確認", "실행"}
+            _CANCEL  = {"取消", "cancel", "no", "キャンセル", "取り消し", "취소"}
+            is_confirm = any(k in body_lower for k in _CONFIRM)
+            is_cancel  = any(k in body_lower for k in _CANCEL)
+            if is_confirm or is_cancel:
+                pop_pending_op(em["in_reply_to"])
+                if is_confirm:
+                    log.info(f"✅ email_manage 已确认，开始执行 {len(pending_op.get('matched_ids', []))} 个操作")
+                    result = execute_email_manage_op(MAILBOXES[mailbox_name], pending_op, PROMPT_LANG)
+                    reply_sub = {"zh": "邮件整理：完成", "ja": "メール整理：完了", "en": "Email organization: done"}.get(PROMPT_LANG, "邮件整理：完成")
+                else:
+                    log.info("❌ email_manage 已取消")
+                    result = {"zh": "操作已取消。", "ja": "操作をキャンセルしました。", "en": "Operation cancelled."}.get(PROMPT_LANG, "操作已取消。")
+                    reply_sub = {"zh": "邮件整理：已取消", "ja": "メール整理：キャンセル済み", "en": "Email organization: cancelled"}.get(PROMPT_LANG, "邮件整理：已取消")
+                send_reply(MAILBOXES[mailbox_name], em["from_email"], reply_sub, result, em.get("message_id"))
+                processed_ids.add(em["id"])
+                save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
+                return
 
 
     # 获取完整会话线索（多层上下文）
@@ -326,6 +351,37 @@ def process_email(mailbox_name, ai_name, backend, em):
         else:
             msg = f"您的任务已安排在 {sch_at} 左右执行。\n\n内容预览：\n{body}"
             send_reply(MAILBOXES[mailbox_name], em["from_email"], f"已安排定时任务：{sub}", msg)
+    elif task_type == "email_manage":
+        log.info("📂 email_manage：执行邮件整理（干运行+确认）")
+        from core.email_manager import search_matching_emails, build_confirmation_body, add_pending_op
+        filter_spec   = (task_payload or {}).get("filter", {})
+        action        = (task_payload or {}).get("action", "move")
+        target_folder = (task_payload or {}).get("target_folder", "")
+        uid_list, sample_subjects = search_matching_emails(MAILBOXES[mailbox_name], filter_spec)
+        if not uid_list:
+            no_match = {"zh": "未找到符合条件的邮件，请检查筛选条件是否正确。", "ja": "条件に一致するメールが見つかりませんでした。", "en": "No emails matched the filter criteria."}.get(PROMPT_LANG, "未找到符合条件的邮件。")
+            send_reply(MAILBOXES[mailbox_name], em["from_email"], sub or em["subject"], no_match, em.get("message_id"))
+        else:
+            op_data = {
+                "mailbox_name": mailbox_name,
+                "from_email": em["from_email"],
+                "original_msg_id": em.get("message_id", ""),
+                "action": action,
+                "filter": filter_spec,
+                "target_folder": target_folder,
+                "matched_ids": uid_list,
+                "matched_count": len(uid_list),
+                "sample_subjects": sample_subjects[:5],
+                "created_at": datetime.now().isoformat(),
+            }
+            confirm_body = build_confirmation_body(op_data, PROMPT_LANG)
+            confirm_sub  = {"zh": f"请确认：{sub or em['subject']}", "ja": f"確認：{sub or em['subject']}", "en": f"Please confirm: {sub or em['subject']}"}.get(PROMPT_LANG, f"请确认：{sub or em['subject']}")
+            sent_msg_id  = send_reply(MAILBOXES[mailbox_name], em["from_email"], confirm_sub, confirm_body, em.get("message_id"))
+            if sent_msg_id:
+                add_pending_op(sent_msg_id, op_data)
+                log.info(f"📋 已发送确认邮件，等待用户授权（{len(uid_list)} 封邮件）")
+            else:
+                log.warning("email_manage: send_reply 未返回 Message-ID，无法存储待确认操作")
     elif task_type and task_type != "email":
         log.info(f"⚡ 立即执行工具任务: {task_type}")
         t_sub, t_body = execute_task_logic({

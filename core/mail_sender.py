@@ -1,12 +1,14 @@
 import smtplib
 import os
 import re
+import uuid
 import logging
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.utils import make_msgid
 from typing import Optional
 
 try:
@@ -30,14 +32,17 @@ def smtp_login(mailbox: dict):
         server.docmd("AUTH", f"XOAUTH2 {make_oauth_string(mailbox['address'], token)}")
     return server
 
-def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str = "", attachments: list = None):
+def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str = "", attachments: list = None) -> str:
+    """Send a reply email. Returns the Message-ID of the sent message."""
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     footer_plain = f"\n\n---\n✉️  由 MailMind AI 自动回复 | {ts}"
     footer_html = f'<br><hr><p style="color: #666; font-size: 12px;">✉️  由 MailMind AI 自动回复 | {ts}</p>'
-    
+
     full_body_plain = body + footer_plain
-    
+
     msg = MIMEMultipart("mixed")
+    msg_id = make_msgid(domain=mailbox["smtp_server"])
+    msg["Message-ID"] = msg_id
     msg["From"], msg["To"], msg["Subject"] = mailbox["address"], to, subject
     if in_reply_to:
         msg["In-Reply-To"] = msg["References"] = in_reply_to
@@ -77,9 +82,10 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
         part.add_header("Content-Disposition", "attachment", filename=att.get("filename", "file.txt"))
         msg.attach(part)
         
-    with smtp_login(mailbox) as s: 
+    with smtp_login(mailbox) as s:
         s.sendmail(mailbox["address"], to, msg.as_string())
     log.info(f"✅ 已回复 -> {to} | {subject}")
+    return msg_id
 
 def archive_output(output: dict, subject: str, body: str, attachments: Optional[list] = None):
     if not output or not output.get("archive"):
