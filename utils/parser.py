@@ -1,8 +1,10 @@
 import json
 import re
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from core.config import WEATHER_DEFAULT_LOCATION, NEWS_DEFAULT_QUERY
+from utils.logger import log
 
 def _parse_time_hhmm(text: str):
     m = re.search(r"(\d{1,2})[:：](\d{2})", text)
@@ -213,6 +215,16 @@ def trim_email_body(body: str, max_chars: int = 4000) -> str:
     # 中文引用头："在 <日期> 写道：" 完整格式（行首）
     trimmed_body = re.split(r'\n在\s+\S.*写道[：:]', trimmed_body)[0]
 
+    # Gmail/Outlook 中文引用头："<email> 于 <日期> 写道：" 格式
+    trimmed_body = re.split(r'\n\S.*于\s+\d{4}年.*写道[：:]', trimmed_body)[0]
+
+    # MailMind 签名分隔符
+    trimmed_body = re.split(r'\n---\s*\n✉️\s+由 MailMind', trimmed_body)[0]
+
+    # 去除 > 引用行（引用邮件正文）
+    lines = [l for l in trimmed_body.splitlines() if not l.startswith('>')]
+    trimmed_body = '\n'.join(lines)
+
     # 截断过长的单封邮件正文（防止超长垃圾邮件或日志文件）
     if len(trimmed_body) > max_chars:
         trimmed_body = trimmed_body[:max_chars] + "...(正文过长已截断)"
@@ -220,13 +232,16 @@ def trim_email_body(body: str, max_chars: int = 4000) -> str:
     return trimmed_body.strip()
 
 def parse_ai_response(raw: str):
-    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    # マークダウンコードブロックを除去
+    cleaned = re.sub(r'```(?:json)?\s*', '', raw).strip()
+    match = re.search(r'\{.*\}', cleaned, re.DOTALL)
     if match:
+        json_str = match.group()
         try:
-            data = json.loads(match.group())
+            data = json.loads(json_str)
             return (
                 data.get("subject", ""),
-                data.get("body", raw),
+                data.get("body") or "",
                 data.get("schedule_at"),
                 data.get("schedule_every"),
                 data.get("schedule_until"),
@@ -236,6 +251,15 @@ def parse_ai_response(raw: str):
                 data.get("task_payload"),
                 data.get("output"),
             )
-        except Exception:
-            pass
-    return "", raw, None, None, None, None, [], None, None, None
+        except json.JSONDecodeError as e:
+            log.warning(f"AI 响应 JSON 解析失败：{e}\n原始响应前200字：{raw[:200]}")
+            # body フィールドだけ regex で抜き出して fallback
+            body_m = re.search(r'"body"\s*:\s*"((?:[^"\\]|\\.)*)"', json_str, re.DOTALL)
+            if body_m:
+                try:
+                    body_text = json.loads('"' + body_m.group(1) + '"')
+                    return "", body_text, None, None, None, None, [], None, None, None
+                except Exception:
+                    pass
+    # JSON が見つからない場合はそのまま body として返す
+    return "", cleaned, None, None, None, None, [], None, None, None
