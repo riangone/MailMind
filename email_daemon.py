@@ -431,7 +431,7 @@ def run_idle(mailbox_name, ai_name, backend):
     retries = 0
     while True:
         try:
-            with imapclient.IMAPClient(mailbox["imap_server"], ssl=True) as client:
+            with imapclient.IMAPClient(mailbox["imap_server"], ssl=True, timeout=60) as client:
                 if mailbox.get("auth") == "password":
                     client.login(mailbox["address"], mailbox["password"])
                 else:

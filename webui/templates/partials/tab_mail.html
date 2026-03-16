@@ -84,7 +84,7 @@
     <div class="form-group">
       <label>{{ t.mail_password }}</label>
       <input type="password"
-             name="{{ mail_config.prefix }}_PASSWORD"
+             name="_password"
              value="{{ mail_config.password }}"
              placeholder="{{ t.mail_password }}">
       <div class="hint">{{ t.mail_password_hint }}</div>
@@ -93,7 +93,7 @@
     <div class="form-group">
       <label>{{ t.mail_allowed }}</label>
       <input type="text"
-             name="{{ mail_config.prefix }}_ALLOWED"
+             name="_allowed"
              value="{{ mail_config.allowed }}"
              placeholder="your@email.com,@company.com">
       <div class="hint">{{ t.mail_allowed_hint }}</div>

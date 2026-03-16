@@ -868,20 +868,13 @@ async def config_mail(request: Request, _auth=Depends(require_auth)):
         prefix = MAILBOX_PREFIX.get(mailbox, "MAIL_CUSTOM")
         updates[f"{prefix}_ADDRESS"] = email_input
 
-    # Re-map password/allowed to correct prefix if MAILBOX changed
-    # (e.g. form had MAIL_CUSTOM_PASSWORD but MAILBOX is now 126)
+    # Map _password / _allowed (fixed-name fields) to the correct prefixed keys
     if mailbox:
         correct_prefix = MAILBOX_PREFIX.get(mailbox, "MAIL_CUSTOM")
-        for suffix in ("_PASSWORD", "_ALLOWED"):
-            correct_key = f"{correct_prefix}{suffix}"
-            if correct_key in updates:
-                continue  # already correct
-            # Look for the value under any other prefix
-            for pfx in MAILBOX_PREFIX.values():
-                wrong_key = f"{pfx}{suffix}"
-                if wrong_key in updates and wrong_key != correct_key:
-                    updates[correct_key] = updates.pop(wrong_key)
-                    break
+        if "_password" in data and isinstance(data["_password"], str):
+            updates[f"{correct_prefix}_PASSWORD"] = data["_password"]
+        if "_allowed" in data and isinstance(data["_allowed"], str):
+            updates[f"{correct_prefix}_ALLOWED"] = data["_allowed"]
 
     try:
         write_env(updates)
