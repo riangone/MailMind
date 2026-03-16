@@ -414,12 +414,12 @@ def fetch_unread_emails(mailbox: dict, processed_ids: set):
                 return
         except Exception:
             return
-        _, ids = mail.search(None, "UNSEEN")
-        for mid in ids[0].split():
-            eid = id_prefix + mid.decode()
+        _, ids = mail.uid("search", None, "UNSEEN")
+        for uid in ids[0].split():
+            eid = id_prefix + uid.decode()
             if eid in processed_ids:
                 continue
-            _, data = mail.fetch(mid, "(RFC822)")
+            _, data = mail.uid("fetch", uid, "(RFC822)")
             msg = email.message_from_bytes(data[0][1])
             sender = decode_str(msg.get("From", ""))
             sender_email = parseaddr(sender)[1].strip()
@@ -427,10 +427,10 @@ def fetch_unread_emails(mailbox: dict, processed_ids: set):
                 continue
             if id_prefix:
                 try:
-                    mail.copy(mid, "INBOX")
-                    mail.store(mid, "+FLAGS", "\\Deleted")
+                    mail.uid("copy", uid, "INBOX")
+                    mail.uid("store", uid, "+FLAGS", "\\Deleted")
                     mail.expunge()
-                    log.info(f"📥 垃圾邮件移入收件箱: {sender_email}")
+                    log.info(f"📥 垃圾邮件移入収件箱: {sender_email}")
                 except Exception as e:
                     log.warning(f"移动垃圾邮件失败: {e}")
             body, atts = get_body_and_attachments(msg)
