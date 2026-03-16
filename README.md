@@ -74,7 +74,23 @@ export NEWS_DEFAULT_COUNTRY=""
 export NEWS_DEFAULT_PAGE_SIZE="8"
 ```
 
-### 🧩 示例指令模板
+### 📋 指令模板
+
+**方式一：推送模板到邮箱（推荐）**
+
+运行以下命令将 7 个预制模板直接写入邮箱的 `MailMind模板` 文件夹，在邮件客户端打开即可编辑发送：
+
+```bash
+bash manage.sh push-templates
+```
+
+**方式二：发送「帮助」获取模板列表**
+
+给 MailMind 邮箱发一封正文为 `帮助`（或 `模板`）的邮件，系统会自动回复全部模板，无需调用 AI。
+
+---
+
+**常用指令示例：**
 
 **1) 定时日报（含天气、新闻、网页检索）**
 
@@ -224,13 +240,14 @@ python3 email_daemon.py --mailbox outlook --auth
 ### 🚀 启动与管理
 
 ```bash
-bash manage.sh start      # 后台启动
-bash manage.sh stop       # 停止
-bash manage.sh restart    # 重启
-bash manage.sh status     # 查看状态和最近日志
-bash manage.sh log        # 实时查看日志
-bash manage.sh install    # 安装为 systemd 服务（开机自启）
-bash manage.sh uninstall  # 卸载 systemd 服务
+bash manage.sh start            # 后台启动
+bash manage.sh stop             # 停止
+bash manage.sh restart          # 重启
+bash manage.sh status           # 查看状态和最近日志
+bash manage.sh log              # 实时查看日志
+bash manage.sh push-templates   # 将指令模板写入邮箱文件夹
+bash manage.sh install          # 安装为 systemd 服务（开机自启）
+bash manage.sh uninstall        # 卸载 systemd 服务
 ```
 
 启动后，给配置的邮箱发一封邮件，正文写指令，60秒内收到 AI 回复。
@@ -410,16 +427,31 @@ export TASK_DEFAULT_AI="openai"
 毎日 09:30 検索 深層学習 前線
 ```
 
+### 📋 指示テンプレート
+
+**方法 1：メールボックスにテンプレートを送信（推奨）**
+
+以下のコマンドで7つのテンプレートをメールボックスの `MailMindテンプレート` フォルダに直接書き込み、メールクライアントから開いて編集して送信できます：
+
+```bash
+bash manage.sh push-templates
+```
+
+**方法 2：「テンプレート」と送信してテンプレート一覧を取得**
+
+MailMind のメールボックスに本文が `テンプレート`（または `ヘルプ`）のメールを送ると、AI を呼ばず自動でテンプレート一覧を返信します。
+
 ### 🚀 使い方
 
 ```bash
-bash manage.sh start      # バックグラウンドで起動
-bash manage.sh stop       # 停止
-bash manage.sh restart    # 再起動
-bash manage.sh status     # 状態と最近のログを表示
-bash manage.sh log        # リアルタイムログ
-bash manage.sh install    # systemd サービスとして登録
-bash manage.sh uninstall  # systemd サービスを削除
+bash manage.sh start             # バックグラウンドで起動
+bash manage.sh stop              # 停止
+bash manage.sh restart           # 再起動
+bash manage.sh status            # 状態と最近のログを表示
+bash manage.sh log               # リアルタイムログ
+bash manage.sh push-templates    # 指示テンプレートをメールボックスに書き込む
+bash manage.sh install           # systemd サービスとして登録
+bash manage.sh uninstall         # systemd サービスを削除
 ```
 
 ### 🤖 対応 AI
@@ -609,16 +641,31 @@ Every day 08:00 weather Tokyo
 Every day 09:30 web search deep learning trends
 ```
 
+### 📋 Instruction Templates
+
+**Option 1: Push templates to your mailbox (recommended)**
+
+Run the command below to write 7 ready-to-use templates directly into a `MailMind Templates` folder in your mailbox. Open any template, fill in the placeholders, and send:
+
+```bash
+bash manage.sh push-templates
+```
+
+**Option 2: Send "help" to get the template list**
+
+Send an email to your MailMind mailbox with just `help` (or `templates`) as the body. The system replies with all templates instantly — no AI call needed.
+
 ### 🚀 Usage
 
 ```bash
-bash manage.sh start      # Start in background
-bash manage.sh stop       # Stop
-bash manage.sh restart    # Restart
-bash manage.sh status     # View status and recent logs
-bash manage.sh log        # Tail live logs
-bash manage.sh install    # Install as systemd service (auto-start on boot)
-bash manage.sh uninstall  # Remove systemd service
+bash manage.sh start             # Start in background
+bash manage.sh stop              # Stop
+bash manage.sh restart           # Restart
+bash manage.sh status            # View status and recent logs
+bash manage.sh log               # Tail live logs
+bash manage.sh push-templates    # Write instruction templates to mailbox folder
+bash manage.sh install           # Install as systemd service (auto-start on boot)
+bash manage.sh uninstall         # Remove systemd service
 ```
 
 Once running, send an email to your configured mailbox with your instruction as the body. You'll receive an AI reply within 60 seconds.
@@ -800,16 +847,31 @@ export TASK_DEFAULT_AI="openai"
 매일 09:30 검색 딥러닝 트렌드
 ```
 
+### 📋 지시 템플릿
+
+**방법 1：메일함에 템플릿 푸시（권장）**
+
+아래 명령으로 7개 템플릿을 메일함의 `MailMind Templates` 폴더에 직접 저장합니다. 메일 클라이언트에서 열어 편집 후 전송하면 됩니다：
+
+```bash
+bash manage.sh push-templates
+```
+
+**방법 2：「help」 전송으로 템플릿 목록 받기**
+
+MailMind 메일함에 본문이 `help`（또는 `templates`）인 이메일을 보내면 AI 호출 없이 즉시 템플릿 목록을 회신합니다.
+
 ### 🚀 사용법
 
 ```bash
-bash manage.sh start      # 백그라운드 시작
-bash manage.sh stop       # 정지
-bash manage.sh restart    # 재시작
-bash manage.sh status     # 상태 및 최근 로그 확인
-bash manage.sh log        # 실시간 로그 보기
-bash manage.sh install    # systemd 서비스로 등록（부팅 시 자동 시작）
-bash manage.sh uninstall  # systemd 서비스 제거
+bash manage.sh start             # 백그라운드 시작
+bash manage.sh stop              # 정지
+bash manage.sh restart           # 재시작
+bash manage.sh status            # 상태 및 최근 로그 확인
+bash manage.sh log               # 실시간 로그 보기
+bash manage.sh push-templates    # 지시 템플릿을 메일함 폴더에 저장
+bash manage.sh install           # systemd 서비스로 등록（부팅 시 자동 시작）
+bash manage.sh uninstall         # systemd 서비스 제거
 ```
 
 시작 후 설정된 메일함으로 이메일을 보내고 본문에 지시를 작성하면 60초 이내에 AI 회신을 받을 수 있습니다.
