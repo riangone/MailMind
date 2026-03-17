@@ -263,7 +263,7 @@ class TaskScheduler:
 
     def _execute_single_task(self, t: dict):
         log.info(f"🔔 执行任务：[{t['subject']}] -> {t['to']}")
-        
+
         # Prepare task dict for registry
         task_for_logic = {
             "type": t["type"],
@@ -271,12 +271,22 @@ class TaskScheduler:
             "subject": t["subject"],
             "body": t["body"],
         }
-        
+
         subject, body = execute_task_logic(task_for_logic)
-        
+
         output = json.loads(t["output"])
         attachments = json.loads(t["attachments"])
-        
+
+        # Build RFC 8058 one-click unsubscribe headers for recurring tasks
+        extra_headers: dict = {}
+        is_recurring = bool(t.get("interval_seconds") or t.get("cron_expr"))
+        if is_recurring:
+            try:
+                from core.one_click_unsubscribe import list_unsubscribe_headers
+                extra_headers = list_unsubscribe_headers(t["id"], t["to"])
+            except Exception as e:
+                log.warning(f"构建 List-Unsubscribe 头失败 (task {t['id']}): {e}")
+
         if output.get("email", True):
             send_reply(
                 MAILBOXES[t["mailbox_name"]],
@@ -284,9 +294,10 @@ class TaskScheduler:
                 subject,
                 body,
                 in_reply_to=t.get("in_reply_to", ""),
-                attachments=attachments
+                attachments=attachments,
+                extra_headers=extra_headers if extra_headers else None,
             )
-        
+
         if output.get("archive", False):
             archive_output(output, subject, body, attachments)
 

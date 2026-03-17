@@ -16,3 +16,6 @@ token_outlook.json
 processed_ids_*.json
 pending_email_ops.json
 reports/
+
+# 一键退订签名密钥（自动生成，不提交）
+.unsubscribe_secret

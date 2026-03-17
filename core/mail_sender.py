@@ -32,8 +32,14 @@ def smtp_login(mailbox: dict):
         server.docmd("AUTH", f"XOAUTH2 {make_oauth_string(mailbox['address'], token)}")
     return server
 
-def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str = "", attachments: list = None) -> str:
-    """Send a reply email. Returns the Message-ID of the sent message."""
+def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str = "", attachments: list = None, extra_headers: dict = None) -> str:
+    """Send a reply email. Returns the Message-ID of the sent message.
+
+    Args:
+        extra_headers: Optional dict of additional MIME headers to set on the
+                       message (e.g. List-Unsubscribe / List-Unsubscribe-Post
+                       for RFC 8058 one-click unsubscribe support).
+    """
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     footer_plain = f"\n\n---\n✉️  由 MailMind AI 自动回复 | {ts}"
     footer_html = f'<br><hr><p style="color: #666; font-size: 12px;">✉️  由 MailMind AI 自动回复 | {ts}</p>'
@@ -46,6 +52,8 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
     msg["From"], msg["To"], msg["Subject"] = mailbox["address"], to, subject
     if in_reply_to:
         msg["In-Reply-To"] = msg["References"] = in_reply_to
+    for header_name, header_value in (extra_headers or {}).items():
+        msg[header_name] = header_value
     
     alt_part = MIMEMultipart("alternative")
     alt_part.attach(MIMEText(full_body_plain, "plain", "utf-8"))

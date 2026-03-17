@@ -1125,6 +1125,133 @@ async def logs_stream(request: Request, _auth=Depends(require_auth)):
     )
 
 
+# ─── RFC 8058 One-Click Unsubscribe endpoint ──────────────────────────────────
+
+@app.get("/unsubscribe", response_class=HTMLResponse)
+async def unsubscribe_get(request: Request, token: str = ""):
+    """
+    Landing page shown when a user follows the unsubscribe link manually
+    (e.g. from plain-text email clients that do not support RFC 8058 POST).
+    Displays a confirmation page; the user clicks a button to POST.
+    """
+    from core.one_click_unsubscribe import verify_token
+    payload = verify_token(token) if token else None
+    if not payload:
+        return HTMLResponse(
+            "<html><body><h2>Invalid or expired unsubscribe link.</h2></body></html>",
+            status_code=400,
+        )
+    task_id = payload.get("t")
+    recipient = payload.get("r", "")
+    safe_token = token.replace('"', "")
+    safe_recipient = html.escape(recipient)
+    safe_task_id = html.escape(str(task_id))
+    page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unsubscribe — MailMind</title>
+  <style>
+    body {{ font-family: sans-serif; max-width: 480px; margin: 80px auto; color: #333; }}
+    h1 {{ font-size: 1.4rem; }}
+    p {{ line-height: 1.6; }}
+    button {{
+      background: #e53e3e; color: #fff; border: none;
+      padding: 10px 24px; border-radius: 4px; font-size: 1rem; cursor: pointer;
+    }}
+    button:hover {{ background: #c53030; }}
+    .note {{ font-size: 0.85rem; color: #666; margin-top: 1.5rem; }}
+  </style>
+</head>
+<body>
+  <h1>Unsubscribe from scheduled emails</h1>
+  <p>Recipient: <strong>{safe_recipient}</strong><br>
+     Task #: <strong>{safe_task_id}</strong></p>
+  <p>Click the button below to cancel this scheduled task and stop receiving these emails.</p>
+  <form method="POST" action="/unsubscribe">
+    <input type="hidden" name="List-Unsubscribe" value="One-Click">
+    <input type="hidden" name="token" value="{safe_token}">
+    <button type="submit">Unsubscribe</button>
+  </form>
+  <p class="note">This will immediately cancel task #{safe_task_id} in MailMind.</p>
+</body>
+</html>"""
+    return HTMLResponse(page)
+
+
+@app.post("/unsubscribe", response_class=HTMLResponse)
+async def unsubscribe_post(request: Request, token: str = Form(""), **_kwargs):
+    """
+    RFC 8058 one-click unsubscribe POST handler.
+
+    Email clients that support RFC 8058 (Gmail, Apple Mail, Outlook) send a
+    POST request to this endpoint with body:
+        List-Unsubscribe=One-Click
+
+    We verify the HMAC-signed token, look up the scheduled task, and cancel it.
+    A 200 OK response with a plain confirmation message is returned.
+    """
+    from core.one_click_unsubscribe import verify_token
+
+    # Accept token from form body OR query string (for browser-button flow)
+    if not token:
+        form = await request.form()
+        token = form.get("token", "")
+
+    payload = verify_token(token) if token else None
+    if not payload:
+        return HTMLResponse(
+            "<html><body><h2>Invalid or expired unsubscribe link.</h2></body></html>",
+            status_code=400,
+        )
+
+    task_id = int(payload.get("t", 0))
+    recipient = payload.get("r", "")
+
+    cancelled = False
+    if DB_FILE.exists() and task_id:
+        try:
+            with sqlite3.connect(str(DB_FILE)) as conn:
+                cur = conn.execute(
+                    "UPDATE tasks SET status='cancelled' "
+                    "WHERE id=? AND status NOT IN ('completed','failed','cancelled')",
+                    (task_id,),
+                )
+                cancelled = cur.rowcount > 0
+        except Exception as e:
+            import logging
+            logging.getLogger("mailmind").warning(f"unsubscribe: DB error: {e}")
+
+    if cancelled:
+        msg = f"You have been unsubscribed. Task #{task_id} has been cancelled."
+        import logging
+        logging.getLogger("mailmind").info(
+            f"One-click unsubscribe: task {task_id} cancelled for {recipient}"
+        )
+    else:
+        msg = f"Task #{task_id} was already completed or not found. No changes made."
+
+    safe_msg = html.escape(msg)
+    page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Unsubscribed — MailMind</title>
+  <style>
+    body {{ font-family: sans-serif; max-width: 480px; margin: 80px auto; color: #333; }}
+    .ok {{ color: #276749; background: #f0fff4; border: 1px solid #9ae6b4;
+           padding: 12px 16px; border-radius: 4px; }}
+    .info {{ color: #744210; background: #fffff0; border: 1px solid #ecc94b;
+             padding: 12px 16px; border-radius: 4px; }}
+  </style>
+</head>
+<body>
+  <div class="{'ok' if cancelled else 'info'}">{safe_msg}</div>
+</body>
+</html>"""
+    return HTMLResponse(page, status_code=200)
+
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
