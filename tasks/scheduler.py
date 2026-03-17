@@ -12,6 +12,8 @@ from core.mail_sender import send_reply, archive_output
 from tasks.registry import execute_task_logic
 from utils.logger import log
 
+MAX_TASK_RETRIES = int(os.environ.get("TASK_MAX_RETRIES", 3))
+
 class TaskScheduler:
     def __init__(self, db_path="tasks.db"):
         self.db_path = os.path.join(os.path.dirname(__file__), "..", db_path)
@@ -43,11 +45,15 @@ class TaskScheduler:
             for col, definition in [
                 ("cron_expr", "TEXT"),
                 ("paused_at", "REAL"),
+                ("retry_count", "INTEGER DEFAULT 0"),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE tasks ADD COLUMN {col} {definition}")
                 except Exception:
                     pass
+            # Indexes for scheduler performance
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_trigger_status ON tasks (trigger_time, status)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_mailbox_status ON tasks (mailbox_name, status)")
 
     def _parse_datetime(self, value: str):
         if not value: return None
@@ -238,8 +244,18 @@ class TaskScheduler:
                             else:
                                 conn.execute("UPDATE tasks SET status = 'completed' WHERE id = ?", (task_dict['id'],))
                         except Exception as e:
-                            log.error(f"执行任务 {task_dict['id']} 出错: {e}")
-                            conn.execute("UPDATE tasks SET status = 'failed' WHERE id = ?", (task_dict['id'],))
+                            retry_count = (task_dict.get("retry_count") or 0) + 1
+                            if retry_count <= MAX_TASK_RETRIES:
+                                backoff = min(60 * (2 ** (retry_count - 1)), 3600)
+                                next_retry = time.time() + backoff
+                                log.warning(f"任务 {task_dict['id']} 出错，{backoff}秒后重试 ({retry_count}/{MAX_TASK_RETRIES}): {e}")
+                                conn.execute(
+                                    "UPDATE tasks SET status='pending', trigger_time=?, retry_count=? WHERE id=?",
+                                    (next_retry, retry_count, task_dict['id'])
+                                )
+                            else:
+                                log.error(f"任务 {task_dict['id']} 已达最大重试次数 ({MAX_TASK_RETRIES})，标记为失败: {e}")
+                                conn.execute("UPDATE tasks SET status = 'failed' WHERE id = ?", (task_dict['id'],))
                         conn.commit()
             except Exception as e:
                 log.error(f"调度器主循环出错: {e}")

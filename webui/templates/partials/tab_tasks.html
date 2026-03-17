@@ -85,6 +85,9 @@
 
           <td>
             <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
+            {% if task.retry_count and task.retry_count > 0 %}
+            <span class="retry-badge" title="retry count">↺{{ task.retry_count }}</span>
+            {% endif %}
           </td>
 
           <td>

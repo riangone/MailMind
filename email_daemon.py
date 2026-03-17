@@ -5,6 +5,7 @@ MailMind — 邮件 → AI 守护进程 (模块化重构版)
 
 import os
 import sys
+import signal
 import time
 import re
 import json
@@ -225,6 +226,16 @@ def _is_help_request(em: dict) -> bool:
 # 初始化线程池与 AI 并发限速器
 executor = ThreadPoolExecutor(max_workers=5)
 _ai_semaphore = threading.Semaphore(AI_CONCURRENCY)
+_shutdown_event = threading.Event()
+
+def _handle_signal(signum, frame):
+    log.info(f"收到信号 {signum}，正在优雅退出...")
+    _shutdown_event.set()
+    executor.shutdown(wait=False)
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, _handle_signal)
+signal.signal(signal.SIGINT, _handle_signal)
 
 # 已处理 ID 路径
 PROCESSED_IDS_PATH: Optional[str] = None
@@ -232,6 +243,9 @@ processed_ids: set = set()
 
 def _default_processed_ids_path(mailbox_name: str) -> str:
     return os.path.join(os.path.dirname(__file__), f"processed_ids_{mailbox_name}.json")
+
+# Keep only the most recent N processed IDs to prevent unbounded growth
+_MAX_PROCESSED_IDS = int(os.environ.get("MAX_PROCESSED_IDS", 5000))
 
 def load_processed_ids(path: str) -> set:
     if not path or not os.path.isfile(path): return set()
@@ -246,8 +260,10 @@ def load_processed_ids(path: str) -> set:
 def save_processed_ids(path: str, ids: set):
     if not path: return
     try:
+        # Trim to most recent _MAX_PROCESSED_IDS entries (by sort order as proxy)
+        trimmed = sorted(ids)[-_MAX_PROCESSED_IDS:]
         with open(path + ".tmp", "w", encoding="utf-8") as f:
-            json.dump(sorted(ids), f, indent=2)
+            json.dump(trimmed, f, indent=2)
         os.replace(path + ".tmp", path)
     except Exception as e:
         log.warning(f"保存 processed_ids 失败：{e}")

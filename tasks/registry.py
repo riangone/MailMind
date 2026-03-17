@@ -329,7 +329,8 @@ def execute_task_logic(task: dict):
         try:
             from skills.loader import get_skill
             skill = get_skill(task_type)
-        except Exception:
+        except Exception as e:
+            log.warning(f"スキル '{task_type}' の読み込みに失敗: {e}")
             skill = None
         if skill:
             ai_name, backend = pick_task_ai(payload)

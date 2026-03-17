@@ -752,6 +752,25 @@ async def logout(request: Request):
     return RedirectResponse(url="/login", status_code=303)
 
 
+@app.get("/health")
+async def health():
+    """Health check endpoint — returns daemon status and DB connectivity."""
+    status = get_status()
+    db_ok = False
+    try:
+        with sqlite3.connect(str(DB_FILE)) as conn:
+            conn.execute("SELECT 1 FROM tasks LIMIT 1")
+        db_ok = True
+    except Exception:
+        pass
+    return {
+        "status": "ok" if status.get("running") else "degraded",
+        "daemon_running": status.get("running", False),
+        "db_ok": db_ok,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, _auth=Depends(require_auth)):
     env = read_env()
