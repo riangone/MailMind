@@ -262,6 +262,9 @@ def execute_task_logic(task: dict):
         if skill:
             ai_name, backend = pick_task_ai(payload)
             ai = get_ai_provider(ai_name, backend)
+            # If payload has no text content, inject task body/subject as fallback prompt
+            if not payload.get("prompt") and not payload.get("text") and not payload.get("code"):
+                payload = {**payload, "prompt": body or subject}
             body = skill.run(payload, ai_caller=ai)
             subject = subject or skill.description
         else:
