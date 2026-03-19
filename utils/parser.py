@@ -3,7 +3,7 @@ import re
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
-from core.config import WEATHER_DEFAULT_LOCATION, NEWS_DEFAULT_QUERY
+from core.config import WEATHER_DEFAULT_LOCATION, NEWS_DEFAULT_QUERY, AUTO_DETECT_TASKS
 from utils.logger import log
 
 
@@ -209,17 +209,21 @@ def auto_detect_task(instruction: str):
     return task_type, payload, output, schedule_at, schedule_every, schedule_cron, schedule_until
 
 def auto_detect_tasks(instruction: str):
+    # 开关控制：若 AUTO_DETECT_TASKS=false 则直接返回空列表
+    if not AUTO_DETECT_TASKS:
+        return []
+    
     # 仅当邮件以特定命令词开头时才解析为任务
     # Chinese, English, Japanese, Korean
     task_prefixes = ["任务：", "task:", "cmd:", "タスク：", "작업:", "命令："]
-    
+
     instruction_lower = instruction.lower()
     prefix_found = None
     for prefix in task_prefixes:
         if instruction_lower.startswith(prefix):
             prefix_found = prefix
             break
-            
+
     if not prefix_found:
         return []
 

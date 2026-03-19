@@ -238,7 +238,7 @@ PROMPT_TEMPLATES = {
   "schedule_until": "重复任务截止时间（ISO格式），与 schedule_every/schedule_cron 配合",
   "attachments": [{{"filename": "a.txt", "content": "文本内容"}}],
   "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<skill名>",
-  "task_payload": {{"query": "...", "location": "...", "prompt": "...",
+  "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread（email_manage）或 list|cancel|pause|resume|delete（task_manage）",
     "task_id": 3,
     "filter": {{"type": "news", "subject": "关键词", "status": "pending|paused"}},
@@ -249,6 +249,7 @@ PROMPT_TEMPLATES = {
 规则：
 - schedule_at / schedule_every / schedule_cron 三选一，不可同时设置。
 - 有定时要求时必须设置 task_type：新闻/股市/简报 → news，天气 → weather，AI 问答/分析 → ai_job，系统状态 → system_status，综合报告 → report。
+- 优先使用 AI skill 模式：task_type="ai_skill"，task_payload={{"skill": "weather|news|stock|web_search", "payload": {{...}}}}，AI 将自动调用外部工具或搜索能力。
 - task_payload 填写任务参数，例如 {{"query": "日本股市行情"}} 或 {{"location": "东京"}}。
 - 邮件整理/归类/移动/删除/标记已读 → email_manage，task_payload 必须包含 action 和 filter，action=move 时还需要 target_folder。
 - 查看/取消/暂停/恢复/删除定时任务 → task_manage，task_payload 包含 action（list/cancel/pause/resume/delete）和 task_id 或 filter。
@@ -269,7 +270,7 @@ PROMPT_TEMPLATES = {
   "schedule_until": "繰り返し終了時刻（ISO形式）、schedule_every/schedule_cronと併用",
   "attachments": [{{"filename": "a.txt", "content": "..."}}],
   "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<スキル名>",
-  "task_payload": {{"query": "...", "location": "...", "prompt": "...",
+  "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread（email_manage）または list|cancel|pause|resume|delete（task_manage）",
     "task_id": 3,
     "filter": {{"type": "news", "subject": "キーワード", "status": "pending|paused"}},
@@ -298,7 +299,7 @@ You are an email AI assistant. Read the email below and execute the task. Reply 
   "schedule_until": "End time for repeating tasks (ISO format), used with schedule_every/schedule_cron",
   "attachments": [{{"filename": "a.txt", "content": "text content"}}],
   "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<skill_name>",
-  "task_payload": {{"query": "...", "location": "...", "prompt": "...",
+  "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread (email_manage) or list|cancel|pause|resume|delete (task_manage)",
     "task_id": 3,
     "filter": {{"type": "news", "subject": "keyword", "status": "pending|paused"}},
@@ -329,7 +330,7 @@ Email:
   "schedule_until": "반복 작업 종료 시각（ISO 형식）, schedule_every/schedule_cron과 함께 사용",
   "attachments": [{{"filename": "a.txt", "content": "텍스트 내용"}}],
   "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<스킬명>",
-  "task_payload": {{"query": "...", "location": "...", "prompt": "...",
+  "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread（email_manage）또는 list|cancel|pause|resume|delete（task_manage）",
     "task_id": 3,
     "filter": {{"type": "news", "subject": "키워드", "status": "pending|paused"}},
@@ -368,3 +369,4 @@ def _load_prompt_template() -> str:
 
 PROMPT_TEMPLATE = _load_prompt_template()
 PROMPT_LANG = os.environ.get("PROMPT_LANG", "zh").lower()
+AUTO_DETECT_TASKS = os.environ.get("AUTO_DETECT_TASKS", "true").lower() == "true"

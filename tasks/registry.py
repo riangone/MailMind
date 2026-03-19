@@ -221,7 +221,7 @@ def _handle_task_manage(payload: dict, subject: str) -> str:
                 count = scheduler.cancel_tasks_by_filter(type_filt, subj_filt)
                 return _t(f"✅ 已取消 {count} 个匹配的任务。", f"✅ {count} 件のタスクをキャンセルしました。", f"✅ Cancelled {count} matching tasks.")
             return _t("⚠️ 批量操作仅支持取消，请提供 task_id 进行暂停/恢复/删除。",
-                      "⚠️ 一括操作はキャンセルのみ対応です。一時停止/再開/削除はtask_idを指定してください。",
+                      "⚠️ 一括操作はキャンセルのみ対応です。一時停止/再開/削除は task_id を指定してください。",
                       "⚠️ Batch operation only supports cancel. Provide task_id for pause/resume/delete.")
 
     return _t(f"⚠️ 未知 task_manage 操作：{action}", f"⚠️ 不明な操作：{action}", f"⚠️ Unknown action: {action}")
@@ -244,7 +244,7 @@ def execute_task_logic(task: dict, lang: str = "zh"):
         body = _tl("⚠️ email_manage 仅支持即时执行，不支持定时任务。",
                    "⚠️ email_manage は即時実行のみ対応で、定期実行はサポートされていません。",
                    "⚠️ email_manage only supports immediate execution; scheduled runs are not supported.",
-                   "⚠️ email_manage는 즉시 실행만 지원하며 예약된 작업은 지원하지 않습니다.")
+                   "⚠️ email_manage 는 즉시 실행만 지원하며 예약된 작업은 지원하지 않습니다.")
     elif task_type == "task_manage":
         # Note: _handle_task_manage already uses internal i18n if available
         body = _handle_task_manage(payload, subject)
@@ -259,27 +259,52 @@ def execute_task_logic(task: dict, lang: str = "zh"):
         else:
             body = call_mcp_tool(server, tool, args)
         subject = subject or f"MCP: {server}/{tool}"
+    elif task_type == "ai_skill":
+        # AI Skill 模式：通过 AI 原生能力 + 工具调用完成
+        from ai.skills import execute_ai_skill
+        skill_name = payload.get("skill") or task_type
+        skill_payload = payload.get("payload") or payload
+        skill_result = execute_ai_skill(skill_name, skill_payload, lang)
+        if skill_result:
+            body = skill_result
+            subject = subject or f"AI Skill: {skill_name}"
+        else:
+            ai_name, backend = pick_task_ai(payload)
+            ai = get_ai_provider(ai_name, backend)
+            prompt = body or subject
+            if backend.get("native_web_search"):
+                prompt = f"请使用你的联网搜索能力完成以下请求：{prompt}"
+            body = ai.call(prompt) or "⚠️ AI 处理失败"
+            subject = subject or f"AI: {skill_name}"
     else:
         # Dispatch to skills (includes built-ins: weather, news, web_search, system_status, ai_job, report)
+        # 向后兼容：优先使用 Python skill，如果不存在则使用 AI skill 模式
         try:
             from skills.loader import get_skill
             skill = get_skill(task_type)
         except Exception as e:
-            log.warning(f"スキル '{task_type}' の読み込みに失敗: {e}")
+            log.warning(f"スキル '{task_type}' の読み込みに失敗：{e}")
             skill = None
+        
         if skill:
+            # Python skill 存在，使用原有逻辑（向后兼容）
             ai_name, backend = pick_task_ai(payload)
             ai = get_ai_provider(ai_name, backend)
-            # If payload has no text content, inject task body/subject as fallback prompt
             if not payload.get("prompt") and not payload.get("text") and not payload.get("code"):
                 payload = {**payload, "prompt": body or subject}
-            # Pass lang if skill supports it
             try:
                 body = skill.run(payload, ai_caller=ai, lang=lang)
             except TypeError:
                 body = skill.run(payload, ai_caller=ai)
             subject = subject or skill.description
         else:
-            body = _tl(f"⚠️ 未知任务类型：{task_type}", f"⚠️ 不明なタスク：{task_type}", f"⚠️ Unknown task type: {task_type}", f"⚠️ 알 수 없는 작업 유형: {task_type}")
+            # Python skill 不存在，尝试 AI skill 模式
+            from ai.skills import execute_ai_skill
+            skill_result = execute_ai_skill(task_type, payload, lang)
+            if skill_result:
+                body = skill_result
+                subject = subject or f"AI Skill: {task_type}"
+            else:
+                body = _tl(f"⚠️ 未知任务类型：{task_type}", f"⚠️ 不明なタスク：{task_type}", f"⚠️ Unknown task type: {task_type}", f"⚠️ 알 수 없는 작업 유형: {task_type}")
 
     return subject, body

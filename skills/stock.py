@@ -1,8 +1,16 @@
+"""
+Stock Skill — 股票/加密货币行情查询
+
+支持多种执行方式：
+1. AI Skill 模式：通过 ai.skills 执行（优先，支持网页搜索）
+2. 传统模式：直接调用 web_search + AI 整理（向后兼容）
+"""
+
 from skills import BaseSkill
+from ai.skills import execute_ai_skill, fetch_stock_via_search, format_stock_result
 from tasks.registry import pick_task_ai
 from ai.providers import get_ai_provider
-from utils.search import web_search, format_search_results
-from core.config import SEARCH_RESULTS_COUNT
+from core.config import SEARCH_RESULTS_COUNT, PROMPT_LANG
 
 
 class StockSkill(BaseSkill):
@@ -16,17 +24,31 @@ class StockSkill(BaseSkill):
         query = payload.get("query") or payload.get("symbol") or payload.get("prompt") or ""
         if not query:
             return "⚠️ 请在 task_payload 中提供 query（股票名称/代码）字段。"
+        
+        lang = payload.get("lang", PROMPT_LANG)
+        
+        # 1. 优先使用 AI Skill 模式（支持网页搜索）
+        result = execute_ai_skill("stock", {"query": query}, lang)
+        if result:
+            return result
+        
+        # 2. 回退到传统模式：web_search + AI 整理
         ai_name, backend = pick_task_ai(payload)
-        ai = get_ai_provider(ai_name, backend)
+        ai = ai_caller or get_ai_provider(ai_name, backend)
+        
+        # 如果 AI 支持 native_web_search，直接让 AI 搜索
         if backend.get("native_web_search"):
             prompt = f"请搜索并报告 {query} 的最新股价/行情，包括今日涨跌幅，重要：请提供数据来源链接。"
             return ai.call(prompt) or "⚠️ 查询失败。"
-        results = web_search(f"{query} stock price today", SEARCH_RESULTS_COUNT)
+        
+        # 否则使用本地 web_search
+        results = fetch_stock_via_search(query, SEARCH_RESULTS_COUNT)
         if results:
-            ctx = format_search_results(results)
+            ctx = format_stock_result(results, lang)
             prompt = f"根据以下搜索结果，整理 {query} 的最新行情：\n\n{ctx}"
         else:
             prompt = f"请告诉我 {query} 的最新股价/行情信息，包括今日涨跌幅。"
+        
         return ai.call(prompt) or "⚠️ 查询失败。"
 
 

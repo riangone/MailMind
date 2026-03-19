@@ -275,6 +275,15 @@
     </div>
 
     <div class="form-group">
+      <label class="toggle-label">
+        <input type="checkbox" name="AUTO_DETECT_TASKS" value="true"
+               {% if env.get('AUTO_DETECT_TASKS', 'true') == 'true' %}checked{% endif %}>
+        {{ t.auto_detect_tasks }}
+      </label>
+      <div class="hint">{{ t.auto_detect_tasks_hint }}</div>
+    </div>
+
+    <div class="form-group">
       <label>{{ t.attach_max_size }}</label>
       <input type="number" name="ATTACHMENT_MAX_SIZE_MB"
              value="{{ env.get('ATTACHMENT_MAX_SIZE_MB', '10') }}"

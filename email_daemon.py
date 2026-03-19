@@ -20,7 +20,7 @@ from core.validator import validate_config
 from core.mail_client import fetch_unread_emails, imap_login, get_oauth_token, fetch_thread_context, push_templates_to_mailbox
 from core.mail_sender import send_reply, archive_output
 from ai.providers import get_ai_provider
-from utils.parser import parse_ai_response, auto_detect_tasks, trim_email_body, detect_lang
+from utils.parser import parse_ai_response, trim_email_body, detect_lang
 from utils.logger import log
 from tasks.scheduler import scheduler
 from tasks.registry import execute_task_logic
@@ -281,6 +281,12 @@ def call_ai(ai_name: str, backend: dict, instruction: str, lang: str = None):
     now = datetime.now().strftime("%Y-%m-%d %H:%M (%Z)")
     tmpl = _get_prompt_template(lang or PROMPT_LANG)
     try:
+        # Inject AI skills hint
+        from ai.skills import get_ai_skills_prompt
+        ai_skill_hint = get_ai_skills_prompt(lang or PROMPT_LANG)
+        if ai_skill_hint:
+            tmpl = ai_skill_hint + "\n\n" + tmpl
+        # Inject Python skills hint (backward compatibility)
         from skills.loader import get_skills_hint
         hint = get_skills_hint(lang or PROMPT_LANG)
         if hint:
@@ -304,16 +310,49 @@ def process_email(mailbox_name, ai_name, backend, em):
     em_lang = detect_lang(email_text)
     lang = em_lang if em_lang in ("zh", "ja", "en", "ko") else PROMPT_LANG
 
-    # 帮助/模板请求：直接回复模板列表，不调用 AI
-    if _is_help_request(em):
-        log.info("📋 检测到帮助请求，回复模板列表")
-        help_body = _HELP_BODY.get(lang, _HELP_BODY["zh"])
-        send_reply(MAILBOXES[mailbox_name], em["from_email"], "MailMindHub 使用模板", help_body, em.get("message_id"), lang=lang)
+    instr = f"发件人：{em['from']}\n主题：{em['subject']}\n\n"
+    instr += trim_email_body(em['body'] or "", max_chars=MAX_EMAIL_CHARS)
+    for att in em.get("attachments", []):
+        if att["is_text"]:
+            content = att["content"]
+            if len(content) > 5000:
+                content = content[:5000] + "...(附件内容过长已截断)"
+            instr += f"\n\n--- 附件：{att['filename']} ---\n{content}"
+
+    # 追加会话上下文，帮助 AI 理解“纠正/修改”类指令
+    thread_ctx = ""
+    if em.get("references") or em.get("in_reply_to"):
+        try:
+            thread_ctx = fetch_thread_context(
+                MAILBOXES[mailbox_name],
+                em.get("references", ""),
+                em.get("in_reply_to", ""),
+            )
+        except Exception as e:
+            log.warning(f"获取会话上下文失败: {e}")
+            thread_ctx = ""
+    if thread_ctx:
+        max_ctx = min(2000, MAX_EMAIL_CHARS)
+        if len(thread_ctx) > max_ctx:
+            thread_ctx = thread_ctx[:max_ctx] + "...(上下文已截断)"
+        instr += f"\n\n--- 会话上下文（供参考） ---\n{thread_ctx}"
+
+    ai_result = call_ai(ai_name, backend, instr, lang=lang)
+    if ai_result is None:
+        # AI call failed — notify user and stop processing
+        err_msg = {
+            "zh": "AI 处理失败，请稍后重试。",
+            "ja": "AI の処理に失敗しました。しばらく経ってから再送してください。",
+            "en": "AI processing failed, please try again later.",
+            "ko": "AI 처리 실패, 잠시 후 다시 시도해 주세요.",
+        }.get(lang, "AI 处理失败，请稍后重试。")
+        send_reply(MAILBOXES[mailbox_name], em["from_email"], em["subject"], err_msg, em.get("message_id"), lang=lang)
         processed_ids.add(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
         return
+    sub, body, sch_at, sch_every, sch_until, sch_cron, atts, task_type, task_payload, output = ai_result
 
-    # email_manage 确认回复检测
+    # email_manage 确认回复检测（先经 AI，再执行）
     if em.get("in_reply_to"):
         from core.email_manager import get_pending_op, pop_pending_op, execute_email_manage_op
         pending_op = get_pending_op(em["in_reply_to"])
@@ -338,41 +377,14 @@ def process_email(mailbox_name, ai_name, backend, em):
                 save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
                 return
 
-    instr = f"发件人：{em['from']}\n主题：{em['subject']}\n\n"
-    instr += trim_email_body(em['body'] or "", max_chars=MAX_EMAIL_CHARS)
-    for att in em.get("attachments", []):
-        if att["is_text"]:
-            content = att["content"]
-            if len(content) > 5000:
-                content = content[:5000] + "...(附件内容过长已截断)"
-            instr += f"\n\n--- 附件：{att['filename']} ---\n{content}"
-
-    ai_result = call_ai(ai_name, backend, instr, lang=lang)
-    if ai_result is None:
-        # AI call failed — notify user and stop processing
-        err_msg = {
-            "zh": "AI 处理失败，请稍后重试。",
-            "ja": "AI の処理に失敗しました。しばらく経ってから再送してください。",
-            "en": "AI processing failed, please try again later.",
-            "ko": "AI 처리 실패, 잠시 후 다시 시도해 주세요.",
-        }.get(lang, "AI 处理失败，请稍后重试。")
-        send_reply(MAILBOXES[mailbox_name], em["from_email"], em["subject"], err_msg, em.get("message_id"), lang=lang)
+    # 帮助/模板请求：先经 AI，再按请求回复模板列表
+    if _is_help_request(em):
+        log.info("📋 检测到帮助请求，回复模板列表")
+        help_body = _HELP_BODY.get(lang, _HELP_BODY["zh"])
+        send_reply(MAILBOXES[mailbox_name], em["from_email"], "MailMindHub 使用模板", help_body, em.get("message_id"), lang=lang)
         processed_ids.add(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
         return
-    sub, body, sch_at, sch_every, sch_until, sch_cron, atts, task_type, task_payload, output = ai_result
-
-    if not task_type:
-        detected_tasks = auto_detect_tasks(trim_email_body(em["body"] or ""))
-        if detected_tasks:
-            det = detected_tasks[0]
-            task_type = det.get("task_type") or task_type
-            if not task_payload and det.get("task_payload"): task_payload = det.get("task_payload")
-            if not output and det.get("output"): output = det.get("output")
-            if not sch_at and det.get("schedule_at"): sch_at = det.get("schedule_at")
-            if not sch_every and det.get("schedule_every"): sch_every = det.get("schedule_every")
-            if not sch_cron and det.get("schedule_cron"): sch_cron = det.get("schedule_cron")
-            if not sch_until and det.get("schedule_until"): sch_until = det.get("schedule_until")
 
     if AI_MODIFY_SUBJECT and sub:
         # 移除可能的前缀以确保标题干净
