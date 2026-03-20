@@ -331,6 +331,44 @@ WORKSPACE_DIR="./workspace"
 
 设置后，所有归档输出（如 `reports/`）将限制在该目录内，防止路径穿越攻击。留空则不限制（向后兼容）。
 
+### 💡 有效使用技巧
+
+长期使用 MailMindHub 后，交互记录本身可能导致收件箱混乱。以下方案可以保持整洁：
+
+**1. 使用专用交互邮箱（最推荐）**
+
+创建一个专门用于 MailMindHub 的邮箱账号，所有指令和回复都在那里，完全不影响主邮箱。
+
+**2. 定时任务结果存本地，不发邮件**
+
+发送指令时指定不发邮件，只归档到本地：
+
+```
+每天 8 点生成系统状态报告，不发邮件，存到 reports 目录
+```
+
+AI 会生成带 `"output": {"email": false, "archive": true}` 的任务，结果只写入 `reports/` 文件夹。
+
+**3. 用邮件客户端过滤器自动归文件夹**
+
+在 Gmail/Outlook 中建立规则：来自 MailMindHub 邮箱的回复自动移入专属文件夹，不出现在主收件箱。
+
+**4. 统一主题命名，利用线程聚合**
+
+同类指令使用固定主题，所有相关回复自动汇聚成一个线程：
+
+```
+主题：【天气查询】     ← 所有天气相关指令
+主题：【代码任务】     ← 所有代码修改指令
+主题：【每日简报】     ← 定时任务线程
+```
+
+**5. 用 `email_manage` 定期清理交互记录**
+
+```
+把 30 天前主题含【AI回复】的邮件全部归档
+```
+
 ---
 
 <a name="日本語"></a>
@@ -526,6 +564,44 @@ bash manage.sh uninstall         # systemd サービスを削除
 | `spark` | iFLYTEK 星火 | `SPARK_API_KEY` |
 | `ernie` | Baidu 文心一言 | `ERNIE_API_KEY` |
 | `yi` | 零一万物 | `YI_API_KEY` |
+
+### 💡 効果的な使い方
+
+長期利用すると、MailMindHub との交互メールが増えて受信ボックスが散らかりがちです。以下の方法で整理できます：
+
+**1. 専用メールボックスを使う（最推奨）**
+
+MailMindHub 専用のメールアカウントを作成し、すべての指示と返信をそこに集約。メインの受信ボックスへの影響をゼロにします。
+
+**2. 定期タスクの結果はメール送信せずローカル保存**
+
+指示メール内で出力先を指定するだけ：
+
+```
+毎朝8時にシステム状態レポートを生成、メールせずに reports フォルダに保存
+```
+
+AI が `"output": {"email": false, "archive": true}` のタスクを生成し、結果は `reports/` に書き込まれます。
+
+**3. メールクライアントのフィルターで自動フォルダ振り分け**
+
+Gmail/Outlook でフィルタールールを設定し、MailMindHub からの返信を専用フォルダへ自動移動。メインの受信ボックスには表示されません。
+
+**4. 件名を統一してスレッドにまとめる**
+
+同じ種類の指示は同じ件名を使うと、返信がひとつのスレッドに集約されます：
+
+```
+件名：【天気確認】     ← 天気関連の指示すべて
+件名：【コード作業】   ← コード修正の指示すべて
+件名：【日次レポート】 ← 定期タスクのスレッド
+```
+
+**5. `email_manage` で古い交互メールを定期クリーンアップ**
+
+```
+30日以上前の件名に【AI返信】が含まれるメールをすべてアーカイブ
+```
 
 ---
 
@@ -760,6 +836,44 @@ WORKSPACE_DIR="./workspace"
 
 When set, all archive outputs (e.g., `reports/`) will be restricted to this directory, preventing path traversal attacks. Leave empty for no restrictions (backward compatible).
 
+### 💡 Tips for Effective Use
+
+Over time, interaction threads with MailMindHub can clutter your inbox. Here are strategies to stay organized:
+
+**1. Use a dedicated mailbox (recommended)**
+
+Create a separate email account exclusively for MailMindHub. All instructions and replies live there, leaving your main inbox untouched.
+
+**2. Archive scheduled task results locally — skip email delivery**
+
+Specify output destination in your instruction:
+
+```
+Every morning at 8am generate a system status report, save to reports folder, do not send email
+```
+
+The AI will produce a task with `"output": {"email": false, "archive": true}`, writing results to `reports/` only.
+
+**3. Use email client filters for automatic folder routing**
+
+Set up a filter in Gmail/Outlook to auto-move MailMindHub replies into a dedicated folder, keeping them out of the main inbox.
+
+**4. Use consistent subject lines to keep threads grouped**
+
+Same-type instructions under the same subject line automatically consolidate into a single thread:
+
+```
+Subject: [Weather]       ← all weather queries
+Subject: [Code Task]     ← all code-related instructions
+Subject: [Daily Report]  ← scheduled task thread
+```
+
+**5. Schedule periodic cleanup with `email_manage`**
+
+```
+Archive all emails older than 30 days whose subject contains [AI Reply]
+```
+
 ---
 
 <a name="한국어"></a>
@@ -960,6 +1074,44 @@ bash manage.sh uninstall         # systemd 서비스 제거
 - `ALLOWED` 화이트리스트를 반드시 본인 이메일로 설정하여 무단 사용 방지
 - `credentials_gmail.json`, `token_*.json` 은 `.gitignore` 에 포함되어 커밋되지 않음
 - `manage.sh` 에 자격 증명이 포함되어 있으므로 푸시 전 확인 또는 `.gitignore` 에 추가
+
+### 💡 효과적인 사용 팁
+
+장기 사용 시 MailMindHub와의 교신 메일이 쌓여 받은편지함이 복잡해질 수 있습니다. 다음 방법으로 정리할 수 있습니다:
+
+**1. 전용 메일함 사용（추천）**
+
+MailMindHub 전용 이메일 계정을 만들어 모든 지시와 답변을 그곳에 집중. 메인 받은편지함에 전혀 영향을 주지 않습니다.
+
+**2. 정기 태스크 결과는 이메일 발송 없이 로컬 저장**
+
+지시 메일에 출력 방식 명시：
+
+```
+매일 아침 8시 시스템 상태 보고서 생성, 이메일 발송 없이 reports 폴더에 저장
+```
+
+AI가 `"output": {"email": false, "archive": true}` 태스크를 생성하여 결과를 `reports/` 에만 기록합니다.
+
+**3. 메일 클라이언트 필터로 자동 폴더 분류**
+
+Gmail/Outlook에서 필터 규칙을 설정해 MailMindHub의 답장을 전용 폴더로 자동 이동. 메인 받은편지함에 표시되지 않습니다.
+
+**4. 제목 통일로 스레드 집약**
+
+같은 종류의 지시에 동일한 제목을 사용하면 모든 관련 답장이 하나의 스레드로 묶입니다:
+
+```
+제목: [날씨 확인]     ← 날씨 관련 지시 전체
+제목: [코드 작업]     ← 코드 수정 지시 전체
+제목: [일일 보고서]   ← 정기 태스크 스레드
+```
+
+**5. `email_manage`로 오래된 교신 메일 정기 정리**
+
+```
+30일 이상된 제목에 [AI답변]이 포함된 메일을 모두 아카이브
+```
 
 ---
 
