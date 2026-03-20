@@ -304,6 +304,17 @@ def call_ai(ai_name: str, backend: dict, instruction: str, lang: str = None):
     return parse_ai_response(raw)
 
 def process_email(mailbox_name, ai_name, backend, em):
+    try:
+        _process_email_impl(mailbox_name, ai_name, backend, em)
+    except Exception as e:
+        import traceback
+        log.error(f"处理邮件失败：{e}")
+        log.error(traceback.format_exc())
+        # 即使失败也标记为已处理，避免无限重试
+        processed_ids.add(em["id"])
+        save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
+
+def _process_email_impl(mailbox_name, ai_name, backend, em):
     log.info(f"📨 收到指令: [{em['subject']}] 来自 {em['from_email']}")
 
     # 优先检测语言，用于后续回复

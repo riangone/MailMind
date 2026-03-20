@@ -46,43 +46,8 @@ def web_search(query: str, num_results: int = 5, engine: Optional[str] = None) -
             log.warning(f"Wikipedia 搜索失败：{e}")
 
     elif engine == "google":
-        google_ok = False
-        try:
-            from googlesearch import search as google_search
-            headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-            urls = list(google_search(query, num_results=num_results, lang="zh-CN"))
-            for url in urls:
-                try:
-                    resp = requests.get(url, headers=headers, timeout=5, allow_redirects=True)
-                    title, snippet = url, ""
-                    if resp.ok and "text/html" in resp.headers.get("Content-Type", ""):
-                        import re as _re
-                        m_title = _re.search(r"<title[^>]*>([^<]{1,200})</title>", resp.text, _re.I)
-                        if m_title:
-                            title = m_title.group(1).strip()
-                        m_desc = _re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']{1,300})', resp.text, _re.I)
-                        if not m_desc:
-                            m_desc = _re.search(r'<meta[^>]+content=["\']([^"\']{1,300})[^>]+name=["\']description["\']', resp.text, _re.I)
-                        if m_desc:
-                            snippet = m_desc.group(1).strip()
-                except Exception:
-                    title, snippet = url, ""
-                results.append({"title": title, "snippet": snippet, "url": url})
-            google_ok = bool(results)
-        except ImportError:
-            log.warning("Google 搜索：未安装 googlesearch-python，请运行 pip install googlesearch-python")
-        except Exception as e:
-            log.warning(f"Google 爬虫搜索失败（{e}），自动回退至 DuckDuckGo")
-        if not google_ok:
-            try:
-                from ddgs import DDGS
-                with DDGS() as ddgs_client:
-                    for item in ddgs_client.text(query, max_results=num_results):
-                        results.append({"title": item.get("title", ""), "snippet": item.get("body", ""), "url": item.get("href", "")})
-                if results:
-                    log.info("Google 不可用，已使用 DuckDuckGo 替代")
-            except Exception as e2:
-                log.warning(f"DuckDuckGo 回退也失败：{e2}")
+        # Google 爬虫模式已禁用（容易导致 429 限流，处理速度慢）
+        log.warning("Google 爬虫搜索已禁用，请使用 DuckDuckGo 或其他引擎")
 
     elif engine == "bing":
         api_key = os.environ.get("BING_API_KEY", "")

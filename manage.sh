@@ -448,6 +448,207 @@ do_log() {
     tail -f "$LOG_FILE"
 }
 
+# ─── 多实例管理（支持多个管理邮箱）──────────────────────────
+# 用法：bash manage.sh instances list
+#       bash manage.sh instance start sort
+#       bash manage.sh instance stop sort
+#       bash manage.sh start-all
+#       bash manage.sh stop-all
+#       bash manage.sh restart-all
+#       bash manage.sh status-all
+
+# 获取所有已配置的管理邮箱（sort, sort2, sort3, ...）
+get_manage_mailboxes() {
+    load_env
+    local boxes=()
+    for suffix in "" "2" "3" "4" "5"; do
+        local var_name="MAIL_SORT${suffix}_ADDRESS"
+        local address="${!var_name}"
+        if [ -n "$address" ]; then
+            if [ -z "$suffix" ]; then
+                boxes+=("sort")
+            else
+                boxes+=("sort${suffix}")
+            fi
+        fi
+    done
+    echo "${boxes[@]}"
+}
+
+# 列出所有已配置的管理邮箱
+do_instances() {
+    heading "已配置的管理邮箱"
+    load_env
+    local found=0
+    for suffix in "" "2" "3" "4" "5"; do
+        local var_name="MAIL_SORT${suffix}_ADDRESS"
+        local address="${!var_name}"
+        if [ -n "$address" ]; then
+            local name="sort${suffix}"
+            local pid_file="$INSTALL_DIR/daemon_${name}.pid"
+            local log_file="$INSTALL_DIR/daemon_${name}.log"
+            local pid=$(cat "$pid_file" 2>/dev/null)
+            local status="${RED}○ 未运行${NC}"
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                status="${GREEN}● 运行中${NC} (PID: $pid)"
+            fi
+            echo -e "  ${name:6s}  $address  $status"
+            found=1
+        fi
+    done
+    if [ $found -eq 0 ]; then
+        warn "未配置任何管理邮箱"
+        echo "       请在 .env 中设置 MAIL_SORT_ADDRESS 等变量"
+    fi
+}
+
+# 启动/停止/重启单个管理邮箱实例
+do_instance() {
+    local subcmd="$1"
+    local name="$2"
+
+    if [ -z "$name" ]; then
+        error "请指定管理邮箱名称 (sort, sort2, sort3, ...)"
+        echo "  用法：bash manage.sh instance [start|stop|restart] <name>"
+        exit 1
+    fi
+
+    local pid_file="$INSTALL_DIR/daemon_${name}.pid"
+    local log_file="$INSTALL_DIR/daemon_${name}.log"
+
+    case "$subcmd" in
+        start)
+            heading "启动管理邮箱实例：$name"
+            load_env
+            ensure_venv
+
+            local address_var="MAIL_SORT${name#sort}_ADDRESS"
+            local address="${!address_var}"
+            if [ -z "$address" ]; then
+                error "未配置管理邮箱：$name"
+                exit 1
+            fi
+
+            nohup "$VENV_PYTHON" "$SCRIPT" --mailbox "$name" --ai "${AI:-claude}" >> "$log_file" 2>&1 &
+            echo $! > "$pid_file"
+            sleep 1
+
+            local pid=$(cat "$pid_file" 2>/dev/null)
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                info "管理邮箱实例已启动 (PID: $pid)"
+                info "日志：$log_file"
+            else
+                error "启动失败，查看日志：tail -f $log_file"
+                exit 1
+            fi
+            ;;
+        stop)
+            heading "停止管理邮箱实例：$name"
+            local pid=$(cat "$pid_file" 2>/dev/null)
+            if [ -z "$pid" ]; then
+                warn "实例 $name 未在运行"
+                return 0
+            fi
+            kill "$pid" 2>/dev/null
+            rm -f "$pid_file"
+            info "实例 $name 已停止 (PID: $pid)"
+            ;;
+        restart)
+            do_instance stop "$name"
+            sleep 1
+            do_instance start "$name"
+            ;;
+        *)
+            error "未知子命令：$subcmd"
+            echo "  用法：bash manage.sh instance [start|stop|restart] <name>"
+            exit 1
+            ;;
+    esac
+}
+
+# 启动所有管理邮箱实例
+do_start_all() {
+    heading "启动所有管理邮箱实例"
+    load_env
+    ensure_venv
+
+    local started=0
+    for suffix in "" "2" "3" "4" "5"; do
+        local var_name="MAIL_SORT${suffix}_ADDRESS"
+        local address="${!address_var}"
+        if [ -n "$address" ]; then
+            local name="sort${suffix}"
+            do_instance start "$name"
+            ((started++))
+        fi
+    done
+
+    if [ $started -eq 0 ]; then
+        warn "未配置任何管理邮箱"
+    else
+        info "已启动 $started 个管理邮箱实例"
+    fi
+}
+
+# 停止所有管理邮箱实例
+do_stop_all() {
+    heading "停止所有管理邮箱实例"
+    local stopped=0
+    for suffix in "" "2" "3" "4" "5"; do
+        local name="sort${suffix}"
+        local pid_file="$INSTALL_DIR/daemon_${name}.pid"
+        local pid=$(cat "$pid_file" 2>/dev/null)
+        if [ -n "$pid" ]; then
+            kill "$pid" 2>/dev/null
+            rm -f "$pid_file"
+            info "实例 $name 已停止"
+            ((stopped++))
+        fi
+    done
+    if [ $stopped -eq 0 ]; then
+        warn "没有运行中的管理邮箱实例"
+    fi
+}
+
+# 重启所有管理邮箱实例
+do_restart_all() {
+    heading "重启所有管理邮箱实例"
+    do_stop_all
+    sleep 2
+    do_start_all
+}
+
+# 查看所有管理邮箱实例状态
+do_status_all() {
+    heading "所有管理邮箱实例状态"
+    load_env
+    local found=0
+    for suffix in "" "2" "3" "4" "5"; do
+        local var_name="MAIL_SORT${suffix}_ADDRESS"
+        local address="${!address_var}"
+        if [ -n "$address" ]; then
+            local name="sort${suffix}"
+            local pid_file="$INSTALL_DIR/daemon_${name}.pid"
+            local log_file="$INSTALL_DIR/daemon_${name}.log"
+            local pid=$(cat "$pid_file" 2>/dev/null)
+            local status="${RED}○ 未运行${NC}"
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                status="${GREEN}● 运行中${NC} (PID: $pid)"
+            fi
+            echo -e "  ${name:6s}  $address  $status"
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo "         日志：$log_file"
+                echo "         最近 3 条:"
+                tail -3 "$log_file" 2>/dev/null | sed 's/^/           /'
+            fi
+            found=1
+        fi
+    done
+    if [ $found -eq 0 ]; then
+        warn "未配置任何管理邮箱"
+    fi
+}
+
 do_install() {
     load_env
     heading "安装为 systemd 服务"
@@ -603,6 +804,13 @@ case "$1" in
         if [ -z "$MAILBOX" ]; then error "未配置邮箱（MAILBOX 为空）"; fi
         "$VENV_PYTHON" "$SCRIPT" --mailbox "$MAILBOX" --push-templates
         ;;
+    # 多实例管理命令
+    instances)      do_instances ;;
+    instance)       do_instance "$2" "$3" ;;
+    start-all)      do_start_all ;;
+    stop-all)       do_stop_all ;;
+    restart-all)    do_restart_all ;;
+    status-all)     do_status_all ;;
     *)
         echo ""
         echo "用法: bash manage.sh <命令>"
@@ -623,7 +831,17 @@ case "$1" in
         echo "    webui status          查看 Web UI 状态"
         echo "    webui log             实时查看 Web UI 日志"
         echo ""
-        echo "  其他:"
+        echo "  多实例管理（管理邮箱）:"
+echo "    instances             列出所有已配置的管理邮箱"
+echo "    instance start <名>    启动单个管理邮箱实例（如：bash manage.sh instance start sort）"
+echo "    instance stop <名>     停止单个管理邮箱实例"
+echo "    instance restart <名>  重启单个管理邮箱实例"
+echo "    start-all             启动所有管理邮箱实例"
+echo "    stop-all              停止所有管理邮箱实例"
+echo "    restart-all           重启所有管理邮箱实例"
+echo "    status-all            查看所有管理邮箱实例状态"
+echo ""
+echo "  其他:"
         echo "    push-templates        将指令模板写入邮箱文件夹（方便直接使用）"
         echo ""
         echo "  系统服务:"

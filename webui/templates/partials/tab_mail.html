@@ -6,6 +6,8 @@
   </div>
   {% endif %}
 
+  <!-- 主邮箱配置 -->
+  <h3>{{ t.main_mailbox_config }}</h3>
   <form hx-post="/config/mail" hx-target="#content" hx-swap="innerHTML">
 
     <div class="form-group">
@@ -102,4 +104,124 @@
     <button type="submit" class="btn">{{ t.btn_save_mail }}</button>
 
   </form>
+
+  <!-- 多管理邮箱配置 -->
+  <h3>{{ t.manage_mailboxes_title }}</h3>
+  <div class="hint" style="margin-bottom: 1rem;">{{ t.manage_mailboxes_hint }}</div>
+
+  <div class="manage-mailboxes">
+    {% for instance in manage_instances %}
+    <div class="manage-mailbox-card">
+      <div class="mailbox-card-header">
+        <span class="mailbox-name">{{ instance.name }}</span>
+        <span class="mailbox-status {{ 'running' if instance.running else 'stopped' }}">
+          {{ t.status_running if instance.running else t.status_stopped }}
+        </span>
+      </div>
+      
+      <form hx-post="/config/manage-mailbox/{{ instance.name }}" hx-target="#content" hx-swap="innerHTML">
+        <input type="hidden" name="INSTANCE_NAME" value="{{ instance.name }}">
+        
+        <div class="form-group">
+          <label>{{ t.mail_address }}</label>
+          <input type="email"
+                 name="ADDRESS"
+                 value="{{ instance.address }}"
+                 placeholder="your@example.com"
+                 hx-post="/autoconfig-manage/{{ instance.name }}"
+                 hx-trigger="blur"
+                 hx-include="[name='ADDRESS'],[name='INSTANCE_NAME']"
+                 hx-target="#manage-provider-{{ instance.name }}"
+                 hx-swap="innerHTML">
+        </div>
+
+        <div id="manage-provider-{{ instance.name }}">
+          {% if instance.mailbox_type %}
+            <div class="provider-info">
+              <span class="provider-tag">{{ instance.mailbox_type.upper() }}</span>
+              {{ instance.mailbox_type }}
+            </div>
+            <input type="hidden" name="MAILBOX_TYPE" value="{{ instance.mailbox_type }}">
+            <input type="hidden" name="PREFIX" value="{{ instance.prefix }}">
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label>{{ t.mail_password }}</label>
+          <input type="password" name="PASSWORD" value="{{ instance.password }}" placeholder="{{ t.mail_password }}">
+        </div>
+
+        <div class="form-group">
+          <label>{{ t.mail_allowed }}</label>
+          <input type="text" name="ALLOWED" value="{{ instance.allowed }}" placeholder="your@email.com,@company.com">
+          <div class="hint">{{ t.mail_allowed_hint }}</div>
+        </div>
+
+        <details class="server-details">
+          <summary>{{ t.mail_server_manual }}</summary>
+          <div class="form-group">
+            <label>{{ t.mail_imap_server }}</label>
+            <input type="text" name="IMAP_SERVER" value="{{ instance.imap_server }}" placeholder="imap.example.com">
+          </div>
+          <div class="form-group">
+            <label>{{ t.mail_imap_port }}</label>
+            <input type="number" name="IMAP_PORT" value="{{ instance.imap_port }}" placeholder="993">
+          </div>
+          <div class="form-group">
+            <label>{{ t.mail_smtp_server }}</label>
+            <input type="text" name="SMTP_SERVER" value="{{ instance.smtp_server }}" placeholder="smtp.example.com">
+          </div>
+          <div class="form-group">
+            <label>{{ t.mail_smtp_port }}</label>
+            <input type="number" name="SMTP_PORT" value="{{ instance.smtp_port }}" placeholder="465">
+          </div>
+          <div class="form-group">
+            <label>{{ t.mail_smtp_ssl }}</label>
+            <select name="SMTP_SSL">
+              <option value="true" {% if instance.smtp_ssl == 'true' %}selected{% endif %}>true</option>
+              <option value="false" {% if instance.smtp_ssl == 'false' %}selected{% endif %}>false</option>
+            </select>
+          </div>
+        </details>
+
+        <div class="mailbox-actions">
+          <button type="submit" class="btn btn-save">{{ t.btn_save_mail }}</button>
+          {% if instance.running %}
+            <button type="button" class="btn btn-stop" 
+                    hx-post="/daemon/manage/{{ instance.name }}/stop"
+                    hx-target="#content"
+                    hx-confirm="{{ t.confirm_stop_instance }}">{{ t.btn_stop }}</button>
+            <button type="button" class="btn btn-restart"
+                    hx-post="/daemon/manage/{{ instance.name }}/restart"
+                    hx-target="#content"
+                    hx-confirm="{{ t.confirm_restart_instance }}">{{ t.btn_restart }}</button>
+          {% else %}
+            <button type="button" class="btn btn-start"
+                    hx-post="/daemon/manage/{{ instance.name }}/start"
+                    hx-target="#content">{{ t.btn_start }}</button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- 批量操作 -->
+  {% if has_manage_instances %}
+  <div class="bulk-actions">
+    <button type="button" class="btn btn-start-all"
+            hx-post="/daemon/manage/start-all"
+            hx-target="#content"
+            hx-confirm="{{ t.confirm_start_all }}">{{ t.btn_start_all }}</button>
+    <button type="button" class="btn btn-stop-all"
+            hx-post="/daemon/manage/stop-all"
+            hx-target="#content"
+            hx-confirm="{{ t.confirm_stop_all }}">{{ t.btn_stop_all }}</button>
+    <button type="button" class="btn btn-restart-all"
+            hx-post="/daemon/manage/restart-all"
+            hx-target="#content"
+            hx-confirm="{{ t.confirm_restart_all }}">{{ t.btn_restart_all }}</button>
+  </div>
+  {% endif %}
+
 </div>

@@ -2,8 +2,8 @@
 requests>=2.28.0        # AI API 调用（anthropic / openai / gemini / qwen）
 imapclient>=2.3.0       # IMAP IDLE 实时推送模式
 markdown>=3.4.0         # 邮件 Markdown 转 HTML 渲染
-ddgs>=0.1.0               # DuckDuckGo 爬虫搜索（无需 API Key）
-googlesearch-python>=1.2.3  # Google 爬虫搜索（无需 API Key）
+ddgs>=0.1.0               # DuckDuckGo 爬虫搜索（默认，无需 API Key）
+googlesearch-python>=1.2.3  # Google 爬虫搜索（已禁用，易 429 限流，可选）
 croniter>=1.3.0         # cron 表达式解析（高级定时任务）
 pystray>=0.19.5         # 系统托盘图标
 Pillow>=10.0.0          # pystray 图标绘制依赖

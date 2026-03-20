@@ -163,6 +163,65 @@ docker compose logs -f daemon
 | iCloud | 应用密码 | 需生成 App-specific password |
 | Proton | Bridge 密码 | 需运行 Proton Bridge |
 | Custom | 密码 | 自定义 IMAP/SMTP 服务器 |
+| Sort / Sort2 / Sort3 | 密码 | 邮件整理专用邮箱（仅执行移动/删除/标记，不回复） |
+
+### 多管理邮箱配置
+
+支持配置多个管理邮箱（`sort`, `sort2`, `sort3`），每个独立运行一个实例：
+
+```bash
+# .env 配置示例
+# 第一个管理邮箱
+MAIL_SORT_ADDRESS="your-manage1@gmail.com"
+MAIL_SORT_PASSWORD="your-password"
+MAIL_SORT_ALLOWED="your-manage1@gmail.com"
+MAIL_SORT_IMAP_SERVER="imap.gmail.com"
+MAIL_SORT_IMAP_PORT="993"
+MAIL_SORT_SMTP_SERVER="smtp.gmail.com"
+MAIL_SORT_SMTP_PORT="465"
+MAIL_SORT_SMTP_SSL="true"
+
+# 第二个管理邮箱
+MAIL_SORT2_ADDRESS="your-manage2@outlook.com"
+MAIL_SORT2_PASSWORD="your-password"
+MAIL_SORT2_ALLOWED="your-manage2@outlook.com"
+MAIL_SORT2_IMAP_SERVER="outlook.office365.com"
+MAIL_SORT2_IMAP_PORT="993"
+MAIL_SORT2_SMTP_SERVER="smtp.office365.com"
+MAIL_SORT2_SMTP_PORT="587"
+MAIL_SORT2_SMTP_SSL="false"
+
+# 第三个管理邮箱（按需添加）
+MAIL_SORT3_ADDRESS="your-manage3@example.com"
+...
+```
+
+**管理命令：**
+```bash
+# 列出所有已配置的管理邮箱
+bash manage.sh instances
+
+# 启动单个管理邮箱实例
+bash manage.sh instance start sort
+bash manage.sh instance start sort2
+
+# 启动所有管理邮箱实例
+bash manage.sh start-all
+
+# 停止所有管理邮箱实例
+bash manage.sh stop-all
+
+# 重启所有管理邮箱实例
+bash manage.sh restart-all
+
+# 查看所有管理邮箱实例状态
+bash manage.sh status-all
+```
+
+**使用场景：**
+- **sort**: 处理个人邮件整理
+- **sort2**: 处理工作邮件整理
+- **sort3**: 处理订阅邮件退订
 
 ### OAuth 首次授权
 
@@ -333,11 +392,13 @@ MCP_SERVER_GITHUB=npx -y @modelcontextprotocol/server-github
 
 支持多种外部数据源（tasks/registry.py, utils/search.py）：
 - **DuckDuckGo**（默认，无需 API Key，使用 `ddgs`）
-- **Google**（无需 API Key，使用 `googlesearch-python`）
 - **Wikipedia**（无需 API Key）
 - **Bing Search**（需 `BING_API_KEY`）
+- **Brave Search**（需 `BRAVE_API_KEY`）
 - **WeatherAPI**（需 `WEATHER_API_KEY`）
 - **NewsAPI**（需 `NEWS_API_KEY`）
+
+> **注意**：Google 爬虫搜索因容易导致 429 限流且处理速度慢，已在 `utils/search.py` 中禁用。如需使用 Google 请使用 Google API 方式（需配置 `GOOGLE_API_KEY` 和 `GOOGLE_CSE_ID`）。
 
 ### 一键退订 (RFC 8058)
 

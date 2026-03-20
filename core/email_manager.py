@@ -62,17 +62,41 @@ def pop_pending_op(in_reply_to: str) -> Optional[dict]:
 # IMAP search
 # ────────────────────────────────────────────────────────────────
 
+def _is_ascii_only(s: str) -> bool:
+    """Check if string contains only ASCII characters."""
+    try:
+        s.encode('ascii')
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 def search_matching_emails(mailbox: dict, filter_spec: dict) -> tuple:
     """Search emails matching filter_spec. Returns (uid_list, sample_subjects).
-    Capped at 200 UIDs to prevent accidental mass operations."""
+    Capped at 200 UIDs to prevent accidental mass operations.
+    
+    Note: IMAP SEARCH only supports ASCII characters for FROM/SUBJECT.
+    Non-ASCII search terms are skipped with a warning log.
+    """
     folder = filter_spec.get("folder", "INBOX")
 
     # Build IMAP SEARCH criteria
     criteria = ["ALL"]
-    if filter_spec.get("from_contains"):
-        criteria = [f'FROM "{filter_spec["from_contains"]}"']
-    if filter_spec.get("subject_contains"):
-        criteria.append(f'SUBJECT "{filter_spec["subject_contains"]}"')
+    
+    from_val = filter_spec.get("from_contains")
+    if from_val:
+        if _is_ascii_only(from_val):
+            criteria = [f'FROM "{from_val}"']
+        else:
+            log.warning(f"email_manage: 跳过非 ASCII 的发件人搜索条件 '{from_val}'（IMAP 不支持）")
+    
+    subject_val = filter_spec.get("subject_contains")
+    if subject_val:
+        if _is_ascii_only(subject_val):
+            criteria.append(f'SUBJECT "{subject_val}"')
+        else:
+            log.warning(f"email_manage: 跳过非 ASCII 的主题搜索条件 '{subject_val}'（IMAP 不支持）")
+    
     if filter_spec.get("since_days"):
         since_date = (datetime.now() - timedelta(days=int(filter_spec["since_days"]))).strftime("%d-%b-%Y")
         criteria.append(f'SINCE {since_date}')
