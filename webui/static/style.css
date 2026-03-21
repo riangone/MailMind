@@ -870,3 +870,95 @@ details.override, details.override summary,
 
 [data-theme="light"] .theme-btn .icon-sun  { display: block; }
 [data-theme="light"] .theme-btn .icon-moon { display: none; }
+
+/* ─── Icon-only header buttons ──────────────────────────────────────────────── */
+.header-btn.icon {
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Header Menu Dropdown ──────────────────────────────────────────────────── */
+.header-menu {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.header-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 11px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--muted2);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.header-menu-btn:hover {
+  color: var(--fg);
+  background: var(--bg3);
+}
+
+.header-menu-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-top: none;
+  min-width: 130px;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.header-menu.open .header-menu-dropdown {
+  display: block;
+}
+
+.header-menu-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 14px 5px;
+}
+
+.header-menu-dropdown a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 14px;
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--muted2);
+  text-decoration: none;
+  letter-spacing: 0.03em;
+  transition: color 0.1s, background-color 0.1s;
+}
+
+.header-menu-dropdown a:hover {
+  color: var(--fg);
+  background: var(--bg3);
+}
+
+.header-menu-dropdown a.active {
+  color: var(--green);
+}
+
+.header-menu-dropdown a.active::after {
+  content: '✓';
+  font-size: 10px;
+}

@@ -26,15 +26,9 @@
     <div class="logo"><span class="logo-brand">Mail</span>Mind<span class="logo-brand">Hub</span></div>
     {% include "partials/header_status.html" %}
   </div>
-  <div class="header-right" style="display:flex;align-items:center;">
-    <div class="lang-switch">
-      <a href="/lang/zh" class="{{ 'active' if ui_lang == 'zh' else '' }}">中</a>
-      <a href="/lang/ja" class="{{ 'active' if ui_lang == 'ja' else '' }}">日</a>
-      <a href="/lang/ko" class="{{ 'active' if ui_lang == 'ko' else '' }}">한</a>
-      <a href="/lang/en" class="{{ 'active' if ui_lang == 'en' else '' }}">EN</a>
-    </div>
-    <button class="theme-btn" onclick="toggleTheme()" id="theme-toggle" title="テーマ切替" aria-label="テーマ切替">
-      <!-- sun: light modeのとき表示 -->
+  <div class="header-right" style="display:flex;align-items:center;height:100%;">
+    <!-- テーマ切替 -->
+    <button class="theme-btn" onclick="toggleTheme()" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
       <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="12" cy="12" r="5"/>
         <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
@@ -42,11 +36,28 @@
         <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
       </svg>
-      <!-- moon: dark modeのとき表示 -->
       <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
       </svg>
     </button>
+    <!-- 言語メニュー -->
+    <div class="header-menu" id="header-menu">
+      <button class="header-menu-btn" onclick="toggleMenu()" aria-label="Language">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span>{{ ui_lang.upper() }}</span>
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="header-menu-dropdown">
+        <div class="header-menu-label">Language</div>
+        <a href="/lang/zh" class="{{ 'active' if ui_lang == 'zh' else '' }}">中文</a>
+        <a href="/lang/ja" class="{{ 'active' if ui_lang == 'ja' else '' }}">日本語</a>
+        <a href="/lang/ko" class="{{ 'active' if ui_lang == 'ko' else '' }}">한국어</a>
+        <a href="/lang/en" class="{{ 'active' if ui_lang == 'en' else '' }}">English</a>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -91,6 +102,17 @@
     });
     el.classList.add('active');
   }
+
+  // 言語メニュードロップダウン
+  function toggleMenu() {
+    document.getElementById('header-menu').classList.toggle('open');
+  }
+  document.addEventListener('click', function(e) {
+    var menu = document.getElementById('header-menu');
+    if (menu && !menu.contains(e.target)) {
+      menu.classList.remove('open');
+    }
+  });
 
   // テーマ切替
   function toggleTheme() {
