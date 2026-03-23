@@ -1,0 +1,112 @@
+<div class="tab-body">
+
+  <div class="tasks-filter" style="margin-bottom: 16px;">
+    <span style="font-size: 12px; font-weight: 600; color: var(--fg);">{{ t.stats_title }}</span>
+    <button class="filter-btn"
+            hx-get="/tabs/stats"
+            hx-target="#content"
+            hx-swap="innerHTML"
+            style="margin-left: auto">{{ t.tasks_refresh }}</button>
+  </div>
+
+  {% if not stats or stats.total == 0 %}
+  <div class="tasks-empty">{{ t.stats_empty }}</div>
+
+  {% else %}
+
+  <!-- ── KPI Cards ──────────────────────────────────────────────── -->
+  <div class="stats-cards">
+    <div class="stats-card">
+      <div class="stats-card-value">{{ stats.total }}</div>
+      <div class="stats-card-label">{{ t.stats_total }}</div>
+    </div>
+    <div class="stats-card">
+      <div class="stats-card-value">{{ stats.today }}</div>
+      <div class="stats-card-label">{{ t.stats_today }}</div>
+    </div>
+    <div class="stats-card">
+      <div class="stats-card-value" style="color: var(--green)">{{ stats.success_rate }}%</div>
+      <div class="stats-card-label">{{ t.stats_success_rate }}</div>
+    </div>
+    <div class="stats-card">
+      <div class="stats-card-value">
+        {% if stats.avg_ai_ms is not none %}{{ stats.avg_ai_ms }} <span style="font-size:10px;color:var(--muted)">{{ t.stats_ms }}</span>{% else %}{{ t.stats_no_data }}{% endif %}
+      </div>
+      <div class="stats-card-label">{{ t.stats_avg_ai }}</div>
+    </div>
+  </div>
+
+  <!-- ── Success / Error split bar ─────────────────────────────── -->
+  {% if stats.total > 0 %}
+  <div style="margin: 16px 0;">
+    <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 4px;">
+      <span>{{ t.stats_success }}: {{ stats.success }}</span>
+      <span>{{ t.stats_error }}: {{ stats.error }}</span>
+    </div>
+    <div style="height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden;">
+      <div style="height: 100%; width: {{ stats.success_rate }}%; background: var(--green); border-radius: 3px; transition: width 0.5s;"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── 7-day bar chart ───────────────────────────────────────── -->
+  {% if stats.days %}
+  <div style="margin: 20px 0 8px; font-size: 10px; color: var(--muted); font-weight: 600;">{{ t.stats_7days }}</div>
+  {% set max_cnt = stats.days | map(attribute='total') | max %}
+  <div class="stats-barchart">
+    {% for d in stats.days %}
+    <div class="stats-bar-col">
+      <div class="stats-bar-wrap">
+        {% if d.total > 0 %}
+          {% set pct = (d.total / (max_cnt if max_cnt > 0 else 1) * 100) | int %}
+          {% set err_pct = (d.errors / d.total * 100) | int %}
+          <div class="stats-bar" style="height: {{ pct }}%;">
+            {% if d.errors > 0 %}
+            <div class="stats-bar-err" style="height: {{ err_pct }}%;"></div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="stats-bar-label" title="{{ d.total }} mails">{{ d.label }}</div>
+      <div class="stats-bar-count">{{ d.total }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── Recent records ───────────────────────────────────────── -->
+  {% if stats.recent %}
+  <div style="margin-top: 20px; font-size: 10px; color: var(--muted); font-weight: 600; margin-bottom: 8px;">{{ t.stats_recent }}</div>
+  <div class="tasks-table-wrap">
+    <table class="tasks-table">
+      <thead>
+        <tr>
+          <th>{{ t.stats_col_time }}</th>
+          <th>{{ t.stats_col_mailbox }}</th>
+          <th>{{ t.stats_col_status }}</th>
+          <th>{{ t.stats_col_ai_ms }}</th>
+          <th>{{ t.stats_col_subject }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in stats.recent %}
+        <tr>
+          <td style="white-space: nowrap; color: var(--muted)">{{ r.ts | fmt_ts }}</td>
+          <td style="color: var(--muted)">{{ r.mailbox or '—' }}</td>
+          <td>
+            <span class="badge badge-{{ r.status }}">{{ r.status }}</span>
+          </td>
+          <td style="color: var(--muted)">{{ r.ai_ms if r.ai_ms else '—' }}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            {{ r.subject or '—' }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</div>

@@ -56,6 +56,18 @@ class TaskScheduler:
             # Indexes for scheduler performance
             conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_trigger_status ON tasks (trigger_time, status)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_mailbox_status ON tasks (mailbox_name, status)")
+            # mail_stats table for dashboard
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS mail_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    mailbox TEXT,
+                    status TEXT,
+                    ai_ms INTEGER,
+                    subject TEXT
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_stats_ts ON mail_stats (ts)")
 
     def _parse_datetime(self, value: str):
         if not value: return None
@@ -74,6 +86,17 @@ class TaskScheduler:
         except Exception as e:
             log.error(f"cron 表达式解析失败 '{cron_expr}': {e}")
             return None
+
+    def record_stat(self, mailbox: str, status: str, ai_ms: int = None, subject: str = None):
+        """Record email processing stat for dashboard."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    "INSERT INTO mail_stats (ts, mailbox, status, ai_ms, subject) VALUES (?,?,?,?,?)",
+                    (time.time(), mailbox, status, ai_ms, (subject or "")[:100])
+                )
+        except Exception as e:
+            log.warning(f"[Stats] Failed to record stat: {e}")
 
     def _parse_duration(self, value: str):
         if not value: return None

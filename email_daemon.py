@@ -398,9 +398,12 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
         }.get(lang, f"⏳ AI 仍在处理中……已用时 {mins} 分 {secs} 秒")
         send_reply(MAILBOXES[mailbox_name], em["from_email"], em["subject"], msg, em.get("message_id"), lang=lang)
 
+    _ai_start = time.time()
     ai_result = call_ai(ai_name, backend, instr, lang=lang, progress_cb=_progress_cb if is_cli else None)
+    _ai_ms = int((time.time() - _ai_start) * 1000)
     if ai_result is None:
         # AI call failed — notify user and stop processing
+        scheduler.record_stat(mailbox_name, "error", _ai_ms, em.get("subject"))
         err_msg = {
             "zh": "AI 处理失败，请稍后重试。",
             "ja": "AI の処理に失敗しました。しばらく経ってから再送してください。",
@@ -411,6 +414,7 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
         processed_ids.add(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
         return
+    scheduler.record_stat(mailbox_name, "success", _ai_ms, em.get("subject"))
     sub, body, sch_at, sch_every, sch_until, sch_cron, atts, task_type, task_payload, output = ai_result
 
     # email_manage 确认回复检测（先经 AI，再执行）

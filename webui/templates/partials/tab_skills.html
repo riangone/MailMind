@@ -31,6 +31,7 @@
           <th>{{ t.skills_col_name }}</th>
           <th>{{ t.skills_col_description }}</th>
           <th>{{ t.skills_col_keywords }}</th>
+          <th>{{ t.tasks_col_actions }}</th>
         </tr>
       </thead>
       <tbody>
@@ -43,6 +44,35 @@
           <td style="color: var(--muted); font-size: 10px;">
             {{ skill.keywords | join(", ") }}
           </td>
+          <td>
+            <button class="btn-sm"
+                    onclick="toggleSkillTest('{{ skill.name }}')">{{ t.skills_test_btn }}</button>
+          </td>
+        </tr>
+        <!-- ── Inline test panel ──────────────────────────── -->
+        <tr id="skill-test-{{ skill.name }}" style="display: none;">
+          <td colspan="4" style="padding: 8px 12px; background: var(--bg2); border-top: 1px solid var(--border);">
+            <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 200px;">
+                <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">{{ t.skills_test_payload }}</div>
+                <textarea id="skill-payload-{{ skill.name }}"
+                          rows="3"
+                          placeholder="{}"
+                          style="width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--fg); font-family: var(--font); font-size: 11px; padding: 6px; border-radius: 3px; resize: vertical;">{}</textarea>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 18px;">
+                <button class="btn-sm"
+                        onclick="runSkillTest('{{ skill.name }}')">{{ t.skills_test_run }}</button>
+                <button class="btn-sm"
+                        onclick="toggleSkillTest('{{ skill.name }}')">{{ t.skills_test_cancel }}</button>
+              </div>
+            </div>
+            <div id="skill-result-{{ skill.name }}" style="display:none; margin-top: 8px;">
+              <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">{{ t.skills_test_result }}</div>
+              <pre id="skill-result-body-{{ skill.name }}"
+                   style="background: var(--bg3); border: 1px solid var(--border); padding: 8px; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; border-radius: 3px; color: var(--log-fg);"></pre>
+            </div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
@@ -53,3 +83,45 @@
   {% endif %}
 
 </div>
+
+<script>
+function toggleSkillTest(name) {
+  var row = document.getElementById('skill-test-' + name);
+  if (row) {
+    row.style.display = (row.style.display === 'none') ? '' : 'none';
+    document.getElementById('skill-result-' + name).style.display = 'none';
+  }
+}
+
+function runSkillTest(name) {
+  var payloadEl = document.getElementById('skill-payload-' + name);
+  var resultDiv = document.getElementById('skill-result-' + name);
+  var resultBody = document.getElementById('skill-result-body-' + name);
+  var payload = {};
+  try { payload = JSON.parse(payloadEl.value || '{}'); } catch(e) {
+    resultBody.textContent = 'JSON parse error: ' + e.message;
+    resultBody.style.color = 'var(--red)';
+    resultDiv.style.display = '';
+    return;
+  }
+  resultBody.textContent = '...';
+  resultBody.style.color = 'var(--log-fg)';
+  resultDiv.style.display = '';
+  fetch('/api/skills/' + encodeURIComponent(name) + '/test', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({payload: payload})
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.ok) {
+      resultBody.textContent = data.result || '(empty result)';
+      resultBody.style.color = 'var(--log-fg)';
+    } else {
+      resultBody.textContent = 'Error: ' + (data.error || 'unknown');
+      resultBody.style.color = 'var(--red)';
+    }
+  }).catch(function(e) {
+    resultBody.textContent = 'Fetch error: ' + e.message;
+    resultBody.style.color = 'var(--red)';
+  });
+}
+</script>

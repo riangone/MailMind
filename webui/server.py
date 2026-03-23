@@ -232,6 +232,19 @@ I18N: dict[str, dict[str, str]] = {
         "vllm_model": "vLLM 模型（VLLM_MODEL）",
         "vllm_api_key": "vLLM API Key（VLLM_API_KEY）",
         "local_llm_hint": "需先在本地启动推理服务",
+        "nav_stats": "统计",
+        "stats_title": "邮件处理统计",
+        "stats_total": "总计处理", "stats_today": "今日", "stats_success_rate": "成功率",
+        "stats_avg_ai": "平均 AI 耗时", "stats_ms": "毫秒",
+        "stats_success": "成功", "stats_error": "失败",
+        "stats_7days": "近 7 天处理量", "stats_recent": "最近记录",
+        "stats_col_time": "时间", "stats_col_mailbox": "邮箱", "stats_col_status": "状态",
+        "stats_col_ai_ms": "AI 耗时(ms)", "stats_col_subject": "主题",
+        "stats_empty": "暂无统计数据，处理邮件后将自动记录",
+        "stats_no_data": "—",
+        "skills_test_btn": "测试", "skills_test_payload": "参数（JSON）",
+        "skills_test_run": "运行", "skills_test_cancel": "取消",
+        "skills_test_result": "执行结果",
     },
     "ja": {
         "slogan": "アプリ不要。新UI不要。メールだけ。",
@@ -330,6 +343,19 @@ I18N: dict[str, dict[str, str]] = {
         "vllm_model": "vLLM モデル (VLLM_MODEL)",
         "vllm_api_key": "vLLM API Key (VLLM_API_KEY)",
         "local_llm_hint": "ローカル推論サービスを事前に起動してください",
+        "nav_stats": "統計",
+        "stats_title": "メール処理統計",
+        "stats_total": "合計処理数", "stats_today": "本日", "stats_success_rate": "成功率",
+        "stats_avg_ai": "平均 AI 応答時間", "stats_ms": "ms",
+        "stats_success": "成功", "stats_error": "失敗",
+        "stats_7days": "直近 7 日間", "stats_recent": "最近の記録",
+        "stats_col_time": "時刻", "stats_col_mailbox": "メールボックス", "stats_col_status": "状態",
+        "stats_col_ai_ms": "AI 応答(ms)", "stats_col_subject": "件名",
+        "stats_empty": "統計データがありません。メールを処理すると自動記録されます",
+        "stats_no_data": "—",
+        "skills_test_btn": "テスト", "skills_test_payload": "パラメータ（JSON）",
+        "skills_test_run": "実行", "skills_test_cancel": "キャンセル",
+        "skills_test_result": "実行結果",
     },
     "en": {
         "slogan": "No app. No new interface. Just email.",
@@ -428,6 +454,19 @@ I18N: dict[str, dict[str, str]] = {
         "vllm_model": "vLLM Model (VLLM_MODEL)",
         "vllm_api_key": "vLLM API Key (VLLM_API_KEY)",
         "local_llm_hint": "Start the local inference service before use",
+        "nav_stats": "Stats",
+        "stats_title": "Mail Processing Stats",
+        "stats_total": "Total Processed", "stats_today": "Today", "stats_success_rate": "Success Rate",
+        "stats_avg_ai": "Avg AI Response", "stats_ms": "ms",
+        "stats_success": "Success", "stats_error": "Error",
+        "stats_7days": "Last 7 Days", "stats_recent": "Recent Records",
+        "stats_col_time": "Time", "stats_col_mailbox": "Mailbox", "stats_col_status": "Status",
+        "stats_col_ai_ms": "AI ms", "stats_col_subject": "Subject",
+        "stats_empty": "No stats yet. Records will appear after emails are processed.",
+        "stats_no_data": "—",
+        "skills_test_btn": "Test", "skills_test_payload": "Payload (JSON)",
+        "skills_test_run": "Run", "skills_test_cancel": "Cancel",
+        "skills_test_result": "Result",
     },
     "ko": {
         "slogan": "앱도, 새로운 인터페이스도 필요 없습니다. 오직 이메일뿐입니다.",
@@ -526,6 +565,19 @@ I18N: dict[str, dict[str, str]] = {
         "vllm_model": "vLLM 모델 (VLLM_MODEL)",
         "vllm_api_key": "vLLM API Key (VLLM_API_KEY)",
         "local_llm_hint": "사전에 로컬 추론 서비스를 실행해 주세요",
+        "nav_stats": "통계",
+        "stats_title": "메일 처리 통계",
+        "stats_total": "총 처리", "stats_today": "오늘", "stats_success_rate": "성공률",
+        "stats_avg_ai": "평균 AI 응답", "stats_ms": "ms",
+        "stats_success": "성공", "stats_error": "실패",
+        "stats_7days": "최근 7일", "stats_recent": "최근 기록",
+        "stats_col_time": "시간", "stats_col_mailbox": "메일함", "stats_col_status": "상태",
+        "stats_col_ai_ms": "AI ms", "stats_col_subject": "제목",
+        "stats_empty": "통계 데이터 없음. 메일 처리 후 자동으로 기록됩니다.",
+        "stats_no_data": "—",
+        "skills_test_btn": "테스트", "skills_test_payload": "파라미터 (JSON)",
+        "skills_test_run": "실행", "skills_test_cancel": "취소",
+        "skills_test_result": "실행 결과",
     },
 }
 
@@ -622,6 +674,61 @@ def get_tasks(status_filter: str = "all", limit: int = 100) -> list[dict]:
             return [dict(r) for r in cur.fetchall()]
     except Exception:
         return []
+
+
+def get_mail_stats() -> dict:
+    """Compute stats from mail_stats table for dashboard."""
+    if not DB_FILE.exists():
+        return {}
+    try:
+        with sqlite3.connect(str(DB_FILE)) as conn:
+            now = time.time()
+            day = 86400
+            # Overall counts
+            total = conn.execute("SELECT COUNT(*) FROM mail_stats").fetchone()[0]
+            success = conn.execute("SELECT COUNT(*) FROM mail_stats WHERE status='success'").fetchone()[0]
+            # Today — use local midnight to avoid UTC offset skew
+            local_now = datetime.now()
+            today_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+            today_total = conn.execute("SELECT COUNT(*) FROM mail_stats WHERE ts >= ?", (today_start,)).fetchone()[0]
+            # Avg AI response time (last 50)
+            ai_rows = conn.execute(
+                "SELECT ai_ms FROM mail_stats WHERE ai_ms IS NOT NULL ORDER BY ts DESC LIMIT 50"
+            ).fetchall()
+            avg_ai_ms = int(sum(r[0] for r in ai_rows) / len(ai_rows)) if ai_rows else None
+            # Last 7 days bar chart data — use local midnight boundaries
+            days_data = []
+            for i in range(6, -1, -1):
+                day_dt = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+                day_dt = day_dt - timedelta(days=i)
+                day_start = day_dt.timestamp()
+                day_end = (day_dt + timedelta(days=1)).timestamp()
+                label = day_dt.strftime("%m/%d")
+                cnt = conn.execute(
+                    "SELECT COUNT(*) FROM mail_stats WHERE ts >= ? AND ts < ?", (day_start, day_end)
+                ).fetchone()[0]
+                err_cnt = conn.execute(
+                    "SELECT COUNT(*) FROM mail_stats WHERE ts >= ? AND ts < ? AND status='error'",
+                    (day_start, day_end)
+                ).fetchone()[0]
+                days_data.append({"label": label, "total": cnt, "errors": err_cnt})
+            # Recent 10 entries
+            conn.row_factory = sqlite3.Row
+            recent = [dict(r) for r in conn.execute(
+                "SELECT * FROM mail_stats ORDER BY ts DESC LIMIT 10"
+            ).fetchall()]
+            return {
+                "total": total,
+                "success": success,
+                "error": total - success,
+                "success_rate": round(success / total * 100, 1) if total else 0,
+                "today": today_total,
+                "avg_ai_ms": avg_ai_ms,
+                "days": days_data,
+                "recent": recent,
+            }
+    except Exception:
+        return {}
 
 
 @app.exception_handler(_LoginRedirect)
@@ -985,6 +1092,32 @@ async def api_skills_reload(request: Request, _auth=Depends(require_auth)):
     feedback = {"ok": True, "message": f"{t['skills_count_prefix']}{len(skills)}{t['skills_count_suffix']}"}
     return templates.TemplateResponse("partials/tab_skills.html", _ctx(
         request, skills=skills, feedback=feedback,
+    ))
+
+
+@app.post("/api/skills/{skill_name}/test")
+async def api_skill_test(request: Request, skill_name: str, _auth=Depends(require_auth)):
+    """Run a skill with given payload and return result."""
+    from skills.loader import get_skill
+    skill = get_skill(skill_name)
+    if not skill:
+        return {"ok": False, "error": f"Skill '{skill_name}' not found"}
+    try:
+        body = await request.json()
+        payload = body.get("payload", {})
+    except Exception:
+        payload = {}
+    try:
+        result = skill.run(payload)
+        return {"ok": True, "result": result}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/tabs/stats", response_class=HTMLResponse)
+async def tab_stats(request: Request, _auth=Depends(require_auth)):
+    return templates.TemplateResponse("partials/tab_stats.html", _ctx(
+        request, stats=get_mail_stats(),
     ))
 
 
