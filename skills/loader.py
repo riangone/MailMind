@@ -27,8 +27,6 @@ def _parse_yaml_frontmatter(text: str) -> dict:
     # 简单 YAML 解析（只支持基本类型）
     meta = {}
     current_key = None
-    current_dict = None
-    current_list = None
     
     for line in yaml_str.strip().split('\n'):
         # 跳过空行
@@ -58,8 +56,6 @@ def _parse_yaml_frontmatter(text: str) -> dict:
                     # 可能是嵌套结构
                     current_key = key
                     meta[key] = None
-                    current_dict = {}
-                    current_list = []
         elif current_key:
             # 嵌套结构
             stripped = line.strip()

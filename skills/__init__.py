@@ -28,6 +28,10 @@ class BaseSkill(ABC):
     def run(self, payload: dict, ai_caller=None) -> str:
         ...
 
+    def validate_payload(self, payload: dict) -> tuple[bool, str]:
+        """Default payload validation (pass-through)."""
+        return True, ""
+
 
 class MDSkill(BaseSkill):
     """
@@ -64,6 +68,23 @@ class MDSkill(BaseSkill):
             except Exception as e:
                 return f"⚠️ 执行失败: {e}"
         return prompt
+
+    def validate_payload(self, payload: dict) -> tuple[bool, str]:
+        params = self.params or {}
+        if not params:
+            return True, ""
+
+        missing = []
+        for key, spec in params.items():
+            required = False
+            if isinstance(spec, dict):
+                required = bool(spec.get("required"))
+            if required and key not in payload:
+                missing.append(key)
+
+        if missing:
+            return False, f"缺少必填参数: {', '.join(missing)}"
+        return True, ""
     
     def _render_instruction(self, payload: dict) -> str:
         result = self.instruction
@@ -71,41 +92,6 @@ class MDSkill(BaseSkill):
             result = result.replace(f"{{{{{key}}}}}", str(value))
         return result
 
-
-class SkillChain:
-    """技能链式调用"""
-    
-    def __init__(self):
-        self.steps = []
-        self.results = []
-    
-    def add_step(self, skill_name: str, payload: dict, condition: str = ""):
-        self.steps.append({"skill": skill_name, "payload": payload, "condition": condition})
-        return self
-    
-    def execute(self, ai_caller=None) -> str:
-        from skills.loader import get_skill
-        
-        for i, step in enumerate(self.steps):
-            if step["condition"] == "prev_success" and (i == 0 or not self.results[-1].get("success")):
-                continue
-            
-            skill = get_skill(step["skill"])
-            if not skill:
-                self.results.append({"step": i, "skill": step["skill"], "success": False, "result": f"⚠️ 不存在: {step['skill']}"})
-                continue
-            
-            try:
-                result = skill.run(step["payload"], ai_caller)
-                self.results.append({"step": i, "skill": step["skill"], "success": True, "result": result})
-            except Exception as e:
-                self.results.append({"step": i, "skill": step["skill"], "success": False, "result": f"⚠️ 失败: {e}"})
-        
-        parts = []
-        for r in self.results:
-            status = "✅" if r["success"] else "❌"
-            parts.append(f"{status} 步骤 {r['step']}: {r['skill']}\n{r['result']}")
-        return "\n\n".join(parts)
 
 
 def get_all_skills_prompt(lang: str = "zh", include_params: bool = False) -> str:

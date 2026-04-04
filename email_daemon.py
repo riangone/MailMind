@@ -18,8 +18,9 @@ from typing import Optional
 # 核心配置与模块
 from core.config import MAILBOXES, AI_BACKENDS, POLL_INTERVAL, DEFAULT_TASK_AI, PROMPT_TEMPLATE, PROMPT_TEMPLATES, AI_CONCURRENCY, AI_MODIFY_SUBJECT, PROMPT_LANG, MAX_EMAIL_CHARS, WORKSPACE_DIR, SHOW_FILE_CHANGES, AI_CLI_TIMEOUT, AI_PROGRESS_INTERVAL
 from core.validator import validate_config
-from core.mail_client import fetch_unread_emails, imap_login, get_oauth_token, fetch_thread_context, push_templates_to_mailbox, send_templates_to_address
+from core.mail_client import fetch_unread_emails, imap_login, fetch_thread_context, push_templates_to_mailbox
 from core.mail_sender import send_reply, archive_output
+from core.prompts import HELP_BODY
 from ai.providers import get_ai_provider
 from utils.parser import parse_ai_response, trim_email_body, detect_lang
 from utils.logger import log
@@ -32,192 +33,6 @@ from concurrent.futures import ThreadPoolExecutor
 # ────────────────────────────────────────────────────────────────
 
 _HELP_KEYWORDS = {"help", "帮助", "模板", "template", "templates", "テンプレート", "ヘルプ", "使い方"}
-
-_HELP_BODY = {
-    "zh": """\
-欢迎使用 MailMindHub！以下是常用指令模板，复制后直接发送即可。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【模板 1】立即提问（AI 直接回答）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-主题：随意
-正文：
-请帮我分析一下[你的问题或内容]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【模板 2】立即网页搜索
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-主题：随意
-正文：
-搜索并总结关于[主题]的最新信息
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【模板 3】立即天气查询
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-主题：随意
-正文：
-查询[城市名]现在的天气
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【模板 4】每日新闻订阅（每天定时发送）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-主题：随意
-正文：
-每天早上9点发送[主题，如：日本股市、AI行业]的最新新闻摘要，持续到[结束日期，如：2026-12-31]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【模板 5】定时提醒（一次性）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-主题：随意
-正文：
-在[时间，如：2026-03-20 10:00]提醒我[提醒内容]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【模板 6】每周定时 AI 分析
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-主题：随意
-正文：
-每周一早上8点帮我分析[主题，如：本周科技热点]并发送邮件
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【模板 7】系统状态报告
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-主题：随意
-正文：
-每天下午6点发送一次服务器运行状态报告
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【技能列表】直接用关键词触发
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-发送含有技能关键词的邮件即可触发对应技能。
-常用技能：翻译、股票查询、代码审查、摘要、待办管理、数学计算、写诗
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-提示：发送「帮助」可随时重新获取本列表。
-""",
-    "ja": """\
-MailMindHub へようこそ！よく使うテンプレートを以下にまとめました。コピーしてそのままお送りください。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【テンプレート 1】即時AI回答
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-件名：なんでも可
-本文：
-[質問や内容]を分析・回答してください
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【テンプレート 2】即時ウェブ検索
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-件名：なんでも可
-本文：
-[トピック]に関する最新情報を検索してまとめてください
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【テンプレート 3】即時天気確認
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-件名：なんでも可
-本文：
-[都市名]の現在の天気を教えてください
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【テンプレート 4】毎日ニュース配信
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-件名：なんでも可
-本文：
-毎朝9時に[テーマ、例：日経225・東証]の最新ニュースを送ってください。[終了日、例：2026-12-31]まで
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【テンプレート 5】一回限りのリマインダー
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-件名：なんでも可
-本文：
-[日時、例：2026-03-20 10:00]に[内容]をリマインドしてください
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【テンプレート 6】毎週定期AI分析
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-件名：なんでも可
-本文：
-毎週月曜朝8時に[テーマ、例：今週のテクノロジー動向]を分析してメールで送ってください
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【テンプレート 7】サーバー状態レポート
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-件名：なんでも可
-本文：
-毎日18時にサーバーの稼働状況レポートを送ってください
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【スキル一覧】キーワードで直接起動
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-スキルのキーワードを含むメールを送信するだけで対応スキルが起動します。
-主なスキル：翻訳、株価照会、コードレビュー、要約、TODO管理、数式計算、詩作成
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ヒント：「テンプレート」または「ヘルプ」と送るといつでもこの一覧を再取得できます。
-""",
-    "en": """\
-Welcome to MailMindHub! Here are ready-to-use templates — just copy and send.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Template 1] Instant AI Answer
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subject: anything
-Body:
-Please analyze / answer: [your question]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Template 2] Instant Web Search
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subject: anything
-Body:
-Search and summarize the latest info about [topic]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Template 3] Instant Weather
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subject: anything
-Body:
-What is the current weather in [city]?
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Template 4] Daily News Digest
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subject: anything
-Body:
-Send me a daily news digest about [topic, e.g. AI industry] every morning at 9am until [end date, e.g. 2026-12-31]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Template 5] One-time Reminder
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subject: anything
-Body:
-Remind me about [content] at [datetime, e.g. 2026-03-20 10:00]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Template 6] Weekly AI Analysis
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subject: anything
-Body:
-Every Monday at 8am, analyze [topic, e.g. this week's tech highlights] and email me the results
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Template 7] Server Status Report
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Subject: anything
-Body:
-Send me a server status report every day at 6pm
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Skills] Trigger directly with keywords
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Send an email containing a skill keyword to trigger the corresponding skill.
-Available skills: translate, stock lookup, code review, summarize, todo management, math calculation, poem writing
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Tip: Send "help" or "templates" anytime to get this list again.
-""",
-}
 
 def _is_help_request(em: dict) -> bool:
     subject = (em.get("subject") or "").strip().lower()
@@ -449,7 +264,7 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
     # 帮助/模板请求：先经 AI，再按请求回复模板列表
     if _is_help_request(em):
         log.info("📋 检测到帮助请求，回复模板列表")
-        help_body = _HELP_BODY.get(lang, _HELP_BODY["zh"])
+        help_body = HELP_BODY.get(lang, HELP_BODY["zh"])
         send_reply(MAILBOXES[mailbox_name], em["from_email"], "MailMindHub 使用模板", help_body, em.get("message_id"), lang=lang)
         processed_ids.add(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
@@ -590,7 +405,7 @@ def process_channel_message(channel_name: str, ai_name: str, backend: dict, em: 
 
         # Help request
         if _is_help_request(em):
-            help_body = _HELP_BODY.get(lang, _HELP_BODY["zh"])
+            help_body = HELP_BODY.get(lang, HELP_BODY["zh"])
             _channel_reply(em, "MailMindHub 使用模板", help_body)
             return
 
