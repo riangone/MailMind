@@ -1,5 +1,7 @@
 import imaplib
 import email
+import socket
+import ssl
 import os
 import re
 import time
@@ -52,14 +54,23 @@ def get_body_and_attachments(msg) -> tuple:
     return body, attachments
 
 def imap_login(mailbox: dict):
-    mail = imaplib.IMAP4_SSL(mailbox["imap_server"], mailbox["imap_port"], timeout=15)
+    # Increase default timeout to 60s for slow SSL handshakes/connections
+    timeout = mailbox.get("timeout", 60)
+    try:
+        mail = imaplib.IMAP4_SSL(mailbox["imap_server"], mailbox["imap_port"], timeout=timeout)
+    except (socket.timeout, ssl.SSLError) as e:
+        log.error(f"IMAP SSL 连接/握手超时 ({mailbox['imap_server']}): {e}")
+        raise
+    except Exception as e:
+        log.error(f"IMAP 连接失败 ({mailbox['imap_server']}): {e}")
+        raise
     if mailbox.get("imap_id"):
         try:
             mail.xatom("ID", '("name" "mailmind" "version" "1.0")')
         except Exception:
             pass
     auth = mailbox.get("auth", "password")
-    if auth == "password":
+    if auth in ("password", "app_password"):
         mail.login(mailbox["address"], mailbox["password"])
     else:
         from core.mail_client_oauth import get_oauth_token # 假设拆分了 OAuth
@@ -92,6 +103,67 @@ def imap_move_messages(mail, uid_list: list, target_folder: str) -> int:
 def imap_archive_messages(mail, uid_list: list, mailbox: dict) -> int:
     return imap_move_messages(mail, uid_list, get_archive_folder(mailbox))
 
+def imap_delete_messages(mail, uid_list: list) -> int:
+    """Permanently delete messages by UID."""
+    if not uid_list: return 0
+    success = 0
+    for uid in uid_list:
+        try:
+            mail.uid("store", uid, "+FLAGS", "\\Deleted")
+            success += 1
+        except Exception as e:
+            log.warning(f"删除 uid={uid} 失败: {e}")
+    mail.expunge()
+    return success
+
+def imap_set_flag(mail, uid_list: list, flag: str, add: bool = True) -> int:
+    r"""Add or remove a flag (e.g. \Seen, \Flagged) on messages by UID."""
+    if not uid_list: return 0
+    success = 0
+    action = "+FLAGS" if add else "-FLAGS"
+    flag_str = flag if flag.startswith("\\") else f"\\{flag}"
+    for uid in uid_list:
+        try:
+            mail.uid("store", uid, action, flag_str)
+            success += 1
+        except Exception as e:
+            log.warning(f"设置标志 {flag} uid={uid} 失败: {e}")
+    return success
+
+def imap_add_label(mail, uid_list: list, label: str) -> int:
+    """Add a Gmail label (via X-GM-LABELS) to messages by UID."""
+    if not uid_list: return 0
+    success = 0
+    for uid in uid_list:
+        try:
+            mail.uid("STORE", uid, "+X-GM-LABELS", f'({label})')
+            success += 1
+        except Exception as e:
+            log.warning(f"添加标签 '{label}' uid={uid} 失败: {e}")
+    return success
+
+def imap_remove_label(mail, uid_list: list, label: str) -> int:
+    """Remove a Gmail label (via X-GM-LABELS) from messages by UID."""
+    if not uid_list: return 0
+    success = 0
+    for uid in uid_list:
+        try:
+            mail.uid("STORE", uid, "-X-GM-LABELS", f'({label})')
+            success += 1
+        except Exception as e:
+            log.warning(f"移除标签 '{label}' uid={uid} 失败: {e}")
+    return success
+
+def imap_search_body(mail, folder: str, body_text: str) -> list:
+    """Search for messages containing body_text in their body (ASCII only)."""
+    try:
+        mail.select(folder, readonly=True)
+        _, data = mail.uid("search", None, f'BODY "{body_text}"')
+        return [u.decode() for u in (data[0] or b"").split()]
+    except Exception as e:
+        log.warning(f"IMAP BODY 搜索失败: {e}")
+        return []
+
 def push_templates_to_mailbox(mailbox: dict, lang: str = "zh") -> int:
     templates = TEMPLATES.get(lang, TEMPLATES["zh"])
     folder = FOLDER_NAMES.get(lang, "MailMindHub_Templates")
@@ -117,48 +189,138 @@ def push_templates_to_mailbox(mailbox: dict, lang: str = "zh") -> int:
     finally:
         mail.logout()
 
-def fetch_unread_emails(mailbox: dict, processed_ids: set):
-    mail = imap_login(mailbox)
+def fetch_unread_emails(mailbox: dict, processed_ids: set, ids_lock=None, existing_conn=None):
+    """Fetch unread emails, checking processed_ids under the given lock for thread safety.
+    
+    Args:
+        existing_conn: Optional existing imapclient.IMAPClient connection (IDLE mode).
+                       When provided, uses its API directly without re-login.
+    """
+    # Detect if existing_conn is an imapclient.IMAPClient (has 'select_folder' method)
+    is_imapclient = existing_conn is not None and hasattr(existing_conn, 'select_folder')
+    
+    if is_imapclient:
+        mail = existing_conn
+        should_logout = False
+        use_imapclient_api = True
+    elif existing_conn is not None:
+        # Standard imaplib connection
+        mail = existing_conn
+        should_logout = False
+        use_imapclient_api = False
+    else:
+        mail = imap_login(mailbox)
+        should_logout = True
+        use_imapclient_api = False
+    
     emails = []
     try:
-        status, _ = mail.select("INBOX")
-        if status != "OK": return []
-        _, ids = mail.uid("search", None, "UNSEEN")
-        for uid in ids[0].split():
-            eid = uid.decode()
-            if eid in processed_ids: continue
-            _, data = mail.uid("fetch", uid, "(RFC822)")
-            msg = email.message_from_bytes(data[0][1])
-            body, atts = get_body_and_attachments(msg)
-            emails.append({
-                "id": eid, 
-                "from": decode_str(msg.get("From", "")),
-                "subject": decode_str(msg.get("Subject", "(无主题)")),
-                "message_id": msg.get("Message-ID", ""),
-                "body": body, 
-                "attachments": atts
-            })
+        if use_imapclient_api:
+            mail.select_folder("INBOX", readonly=False)
+        else:
+            status, _ = mail.select("INBOX")
+            if status != "OK": return []
+        
+        try:
+            if use_imapclient_api:
+                ids = mail.search("UNSEEN")
+                ids_bytes = [str(i).encode() for i in ids]
+            else:
+                _, ids = mail.uid("search", None, "UNSEEN")
+                ids_bytes = ids[0].split() if ids and ids[0] else []
+        except (imaplib.IMAP4.abort, OSError) as e:
+            log.warning(f"IMAP search 超时: {e}")
+            return []
+        
+        if not ids_bytes: return []
+        
+        for uid in ids_bytes:
+            eid = uid.decode() if isinstance(uid, bytes) else str(uid)
+            # Thread-safe check-and-add
+            if ids_lock is not None:
+                with ids_lock:
+                    if eid in processed_ids:
+                        continue
+                    processed_ids.add(eid)
+            else:
+                if eid in processed_ids:
+                    continue
+            try:
+                if use_imapclient_api:
+                    msg_bytes = mail.fetch([int(eid)], ["RFC822"])[int(eid)][b"RFC822"]
+                else:
+                    _, data = mail.uid("fetch", uid, "(RFC822)")
+                    msg_bytes = data[0][1] if data and data[0] else None
+                
+                if not msg_bytes: continue
+                msg = email.message_from_bytes(msg_bytes)
+                body, atts = get_body_and_attachments(msg)
+                emails.append({
+                    "id": eid,
+                    "from": decode_str(msg.get("From", "")),
+                    "subject": decode_str(msg.get("Subject", "(无主题)")),
+                    "message_id": msg.get("Message-ID", ""),
+                    "body": body,
+                    "attachments": atts
+                })
+            except (imaplib.IMAP4.abort, OSError, KeyError) as e:
+                log.warning(f"IMAP fetch 超时 (uid={eid}): {e}")
+                # Revert the mark if fetch timed out (email not fully retrieved)
+                if ids_lock is not None:
+                    with ids_lock:
+                        processed_ids.discard(eid)
+                continue
     finally:
-        mail.logout()
+        if should_logout:
+            try:
+                mail.logout()
+            except Exception:
+                pass
     return emails
 
 def fetch_thread_context(mailbox: dict, references: str, in_reply_to: str = "", max_depth: int = 5) -> str:
-    # 简化后的上下文获取逻辑
     ref_ids = [mid.strip() for mid in (references or "").split() if mid.strip()]
     if in_reply_to: ref_ids.append(in_reply_to.strip())
     if not ref_ids: return ""
-    
+
     mail = imap_login(mailbox)
     results = []
     try:
         for folder in ["INBOX", "Sent", '"[Gmail]/Sent Mail"']:
-            mail.select(folder, readonly=True)
+            try:
+                mail.select(folder, readonly=True)
+            except Exception:
+                continue
             for mid in ref_ids[-max_depth:]:
-                _, data = mail.search(None, f'HEADER Message-ID "{mid}"')
-                for msg_id in data[0].split():
-                    _, msg_data = mail.fetch(msg_id, "(RFC822)")
-                    body, _ = get_body_and_attachments(email.message_from_bytes(msg_data[0][1]))
-                    if body: results.append(body)
+                # 转义 IMAP 特殊字符
+                safe_mid = mid.replace("\\", "\\\\").replace('"', '\\"')
+                try:
+                    _, data = mail.search(None, f'HEADER Message-ID "{safe_mid}"')
+                    for msg_id in data[0].split():
+                        try:
+                            _, msg_data = mail.fetch(msg_id, "(RFC822)")
+                            body, _ = get_body_and_attachments(email.message_from_bytes(msg_data[0][1]))
+                            if body: results.append(body)
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
     finally:
-        mail.logout()
+        try:
+            mail.logout()
+        except Exception:
+            pass
     return "\n\n---\n\n".join(results)
+
+# ────────────────────────────────────────────────────────────────
+# OAuth 兼容接口（供发送端复用）
+# ────────────────────────────────────────────────────────────────
+
+def get_oauth_token(mailbox: dict) -> str:
+    from core.mail_client_oauth import get_oauth_token as _get_oauth_token
+    return _get_oauth_token(mailbox)
+
+def make_oauth_string(email_address: str, token: str) -> str:
+    return base64.b64encode(
+        f"user={email_address}\x01auth=Bearer {token}\x01\x01".encode()
+    ).decode()

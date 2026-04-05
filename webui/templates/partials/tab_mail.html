@@ -105,6 +105,93 @@
 
   </form>
 
+  <!-- ── 操作按钮 ─────────────────────────────────────────────── -->
+  <div class="mail-actions">
+    <div class="action-group">
+      <h4>邮件模板</h4>
+      <div class="action-buttons">
+        <button class="btn-action"
+                hx-post="/mail/push-templates"
+                hx-target="#content"
+                hx-swap="innerHTML"
+                hx-confirm="将指令模板发送到管理邮箱？">
+          📧 推送模板到管理邮箱
+        </button>
+        <button class="btn-action"
+                hx-post="/mail/push-templates-to"
+                hx-target="#content"
+                hx-swap="innerHTML">
+          📤 发送模板到指定邮箱
+        </button>
+      </div>
+    </div>
+
+    <div class="action-group">
+      <h4>系统管理</h4>
+      <div class="action-buttons">
+        <button class="btn-action"
+                hx-post="/systemd/install"
+                hx-target="#content"
+                hx-swap="innerHTML"
+                hx-confirm="安装 systemd 服务（开机自启）？">
+          🔧 安装系统服务
+        </button>
+        <button class="btn-action danger"
+                hx-post="/systemd/uninstall"
+                hx-target="#content"
+                hx-swap="innerHTML"
+                hx-confirm="卸载 systemd 服务？">
+          🗑️ 卸载系统服务
+        </button>
+      </div>
+    </div>
+
+    <div class="action-group">
+      <h4>OAuth 授权</h4>
+      <div class="action-buttons">
+        <button class="btn-action"
+                onclick="showOAuthGuide('gmail')">
+          🔑 Gmail OAuth 授权指南
+        </button>
+        <button class="btn-action"
+                onclick="showOAuthGuide('outlook')">
+          🔑 Outlook OAuth 授权指南
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OAuth 授权引导模态框 ────────────────────────────────── -->
+  <div id="oauth-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="oauth-modal-title">OAuth 授权指南</h3>
+        <button class="modal-close" onclick="closeOAuthModal()">×</button>
+      </div>
+      <div class="modal-body" id="oauth-modal-body">
+        <!-- Content will be injected by JS -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeOAuthModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 推送模板到指定邮箱表单 ───────────────────────────────── -->
+  <div id="push-template-form" style="display:none; margin-top: 24px; padding: 20px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px;">
+    <h3 style="margin-bottom: 16px;">发送模板到指定邮箱</h3>
+    <form hx-post="/mail/push-templates-to-submit" hx-target="#content" hx-swap="innerHTML">
+      <div class="form-group">
+        <label>目标邮箱地址</label>
+        <input type="email" name="target_email" placeholder="recipient@example.com" required>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-cancel" onclick="document.getElementById('push-template-form').style.display='none'">取消</button>
+        <button type="submit" class="btn-primary">发送</button>
+      </div>
+    </form>
+  </div>
+
   <!-- 多管理邮箱配置 -->
   <div class="section-title">{{ t.manage_mailboxes_title }}</div>
   <div class="hint" style="margin-bottom: 1rem;">{{ t.manage_mailboxes_hint }}</div>
@@ -228,3 +315,95 @@
   {% endif %}
 
 </div>
+
+<script>
+function showOAuthGuide(provider) {
+  const modal = document.getElementById('oauth-modal');
+  const title = document.getElementById('oauth-modal-title');
+  const body = document.getElementById('oauth-modal-body');
+  
+  modal.style.display = 'flex';
+  
+  if (provider === 'gmail') {
+    title.textContent = 'Gmail OAuth 授权指南';
+    body.innerHTML = `
+      <div class="oauth-guide">
+        <h4>步骤 1: 下载 OAuth 凭据文件</h4>
+        <ol>
+          <li>访问 <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></li>
+          <li>创建或选择项目</li>
+          <li>启用 Gmail API</li>
+          <li>创建 OAuth 2.0 客户端 ID（桌面应用）</li>
+          <li>下载 JSON 文件并重命名为 <code>credentials_gmail.json</code></li>
+          <li>将文件放到项目根目录</li>
+        </ol>
+        
+        <h4>步骤 2: 运行授权命令</h4>
+        <pre><code>export MAIL_GMAIL_ADDRESS="your@gmail.com"
+export MAIL_GMAIL_ALLOWED="your@gmail.com"
+python3 email_daemon.py --mailbox gmail --auth</code></pre>
+        
+        <h4>步骤 3: 完成授权</h4>
+        <ol>
+          <li>终端会打印授权 URL</li>
+          <li>在浏览器中打开该 URL</li>
+          <li>登录 Google 账号并授权</li>
+          <li>复制授权码并粘贴回终端</li>
+          <li>授权成功后会生成 <code>token_gmail.json</code></li>
+        </ol>
+        
+        <div class="oauth-notice">
+          <p><strong>注意：</strong>授权完成后重启守护进程以启用 OAuth。</p>
+        </div>
+      </div>
+    `;
+  } else if (provider === 'outlook') {
+    title.textContent = 'Outlook OAuth 授权指南';
+    body.innerHTML = `
+      <div class="oauth-guide">
+        <h4>步骤 1: 注册 Azure 应用</h4>
+        <ol>
+          <li>访问 <a href="https://portal.azure.com" target="_blank">Azure Portal</a></li>
+          <li>进入"应用注册" → "新注册"</li>
+          <li>填写应用名称和重定向 URI（选择"公共客户端/移动和桌面"）</li>
+          <li>添加权限：Microsoft Graph → Mail.Read、Mail.Send</li>
+          <li>复制"应用程序(客户端)ID"</li>
+        </ol>
+        
+        <h4>步骤 2: 配置 Client ID</h4>
+        <p>在 WebUI 的邮件设置中填写 <code>Azure App Client ID</code> 字段，或设置环境变量：</p>
+        <pre><code>export OUTLOOK_CLIENT_ID="your-client-id"</code></pre>
+        
+        <h4>步骤 3: 运行授权命令</h4>
+        <pre><code>export MAIL_OUTLOOK_ADDRESS="your@outlook.com"
+export MAIL_OUTLOOK_ALLOWED="your@outlook.com"
+python3 email_daemon.py --mailbox outlook --auth</code></pre>
+        
+        <h4>步骤 4: 完成授权</h4>
+        <ol>
+          <li>终端会显示一个短码和设备登录 URL</li>
+          <li>在浏览器中打开 <code>https://microsoft.com/devicelogin</code></li>
+          <li>输入短码并登录 Microsoft 账号授权</li>
+          <li>授权成功后会生成 <code>token_outlook.json</code></li>
+        </ol>
+        
+        <div class="oauth-notice">
+          <p><strong>注意：</strong>授权完成后重启守护进程以启用 OAuth。</p>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function closeOAuthModal() {
+  document.getElementById('oauth-modal').style.display = 'none';
+}
+
+// 点击模态框外部关闭
+document.addEventListener('click', function(e) {
+  const modal = document.getElementById('oauth-modal');
+  if (e.target === modal) {
+    closeOAuthModal();
+  }
+});
+</script>

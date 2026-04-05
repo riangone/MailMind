@@ -1,6 +1,5 @@
 <div id="header-status"
-     hx-get="/partials/header_status"
-     hx-trigger="every 5s"
+     hx-trigger="none"
      hx-swap="outerHTML">
   <div class="header-status">
     <span class="status-dot {{ 'on' if status.running else 'off' }}"></span>

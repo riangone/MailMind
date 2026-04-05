@@ -44,6 +44,7 @@ WEBUI_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.config import AI_BACKENDS as _CORE_AI_BACKENDS
+from utils.logger import log
 
 AI_BACKENDS: dict[str, dict] = {
     name: {
@@ -245,8 +246,56 @@ I18N: dict[str, dict[str, str]] = {
         "stats_empty": "暂无统计数据，处理邮件后将自动记录",
         "stats_no_data": "—",
         "skills_test_btn": "测试", "skills_test_payload": "参数（JSON）",
+        "skills_test_params": "参数说明",
         "skills_test_run": "运行", "skills_test_cancel": "取消",
-        "skills_test_result": "执行结果",
+        "skills_test_result": "执行结果", "skills_test_fill_example": "填入示例",
+        "skills_test_copy": "复制",
+        "tasks_new_title": "新建任务",
+        "tasks_edit_title": "编辑任务 #",
+        "tasks_new_btn": "新建任务",
+        "tasks_edit_btn": "编辑",
+        "tasks_cancel_btn": "取消",
+        "tasks_save_btn": "保存",
+        "tasks_field_subject": "任务主题",
+        "tasks_field_body": "任务内容",
+        "tasks_field_type": "任务类型",
+        "tasks_field_schedule_at": "执行时间",
+        "tasks_field_schedule_every": "重复间隔",
+        "tasks_field_schedule_cron": "Cron 表达式",
+        "tasks_field_task_type": "任务类型",
+        "tasks_field_task_payload": "任务参数（JSON）",
+        "tasks_field_to": "收件人",
+        "tasks_type_email": "邮件",
+        "tasks_type_ai_job": "AI 任务",
+        "tasks_type_weather": "天气",
+        "tasks_type_news": "新闻",
+        "tasks_type_web_search": "网页搜索",
+        "tasks_type_system_status": "系统状态",
+        "tasks_type_report": "报告",
+        "tasks_type_mcp_call": "MCP 调用",
+        "tasks_schedule_once": "单次执行",
+        "tasks_schedule_recurring": "周期执行",
+        "tasks_schedule_cron": "Cron 表达式",
+        "tasks_schedule_none": "不设置",
+        "tasks_confirm_edit": "编辑此任务？",
+        "nav_instances": "实例",
+        "instances_title": "多实例管理",
+        "instances_empty": "未检测到多实例配置",
+        "instances_hint": "在 .env 中配置 MAIL_SORT2_ADDRESS 或 MAIL_SORT3_ADDRESS 以启用多实例",
+        "instances_col_name": "实例名",
+        "instances_col_address": "邮箱地址",
+        "instances_col_status": "状态",
+        "instances_col_pid": "PID",
+        "instances_col_mailbox": "邮箱类型",
+        "instances_col_ai": "AI 后端",
+        "instances_btn_start": "启动",
+        "instances_btn_stop": "停止",
+        "instances_btn_restart": "重启",
+        "instances_main": "主实例",
+        "instance_started": "实例已启动",
+        "instance_stopped": "实例已停止",
+        "instance_restarted": "实例已重启",
+        "instance_action_failed": "操作失败: ",
     },
     "ja": {
         "slogan": "アプリ不要。新UI不要。メールだけ。",
@@ -357,8 +406,56 @@ I18N: dict[str, dict[str, str]] = {
         "stats_empty": "統計データがありません。メールを処理すると自動記録されます",
         "stats_no_data": "—",
         "skills_test_btn": "テスト", "skills_test_payload": "パラメータ（JSON）",
+        "skills_test_params": "パラメータ説明",
         "skills_test_run": "実行", "skills_test_cancel": "キャンセル",
-        "skills_test_result": "実行結果",
+        "skills_test_result": "実行結果", "skills_test_fill_example": "例を入力",
+        "skills_test_copy": "コピー",
+        "tasks_new_title": "タスク新規作成",
+        "tasks_edit_title": "タスク編集 #",
+        "tasks_new_btn": "タスク作成",
+        "tasks_edit_btn": "編集",
+        "tasks_cancel_btn": "キャンセル",
+        "tasks_save_btn": "保存",
+        "tasks_field_subject": "件名",
+        "tasks_field_body": "内容",
+        "tasks_field_type": "タイプ",
+        "tasks_field_schedule_at": "実行時刻",
+        "tasks_field_schedule_every": "間隔",
+        "tasks_field_schedule_cron": "cron 式",
+        "tasks_field_task_type": "タスク種類",
+        "tasks_field_task_payload": "パラメータ（JSON）",
+        "tasks_field_to": "宛先",
+        "tasks_type_email": "メール",
+        "tasks_type_ai_job": "AI タスク",
+        "tasks_type_weather": "天気",
+        "tasks_type_news": "ニュース",
+        "tasks_type_web_search": "Web 検索",
+        "tasks_type_system_status": "システム状態",
+        "tasks_type_report": "レポート",
+        "tasks_type_mcp_call": "MCP 呼出",
+        "tasks_schedule_once": "一度きり",
+        "tasks_schedule_recurring": "繰り返し",
+        "tasks_schedule_cron": "cron 式",
+        "tasks_schedule_none": "なし",
+        "tasks_confirm_edit": "このタスクを編集しますか？",
+        "nav_instances": "インスタンス",
+        "instances_title": "マルチインスタンス管理",
+        "instances_empty": "マルチインスタンス設定が見つかりません",
+        "instances_hint": ".env で MAIL_SORT2_ADDRESS または MAIL_SORT3_ADDRESS を設定してマルチインスタンスを有効化してください",
+        "instances_col_name": "インスタンス名",
+        "instances_col_address": "メールアドレス",
+        "instances_col_status": "ステータス",
+        "instances_col_pid": "PID",
+        "instances_col_mailbox": "メールボックス",
+        "instances_col_ai": "AI バックエンド",
+        "instances_btn_start": "起動",
+        "instances_btn_stop": "停止",
+        "instances_btn_restart": "再起動",
+        "instances_main": "メインインスタンス",
+        "instance_started": "インスタンスを起動しました",
+        "instance_stopped": "インスタンスを停止しました",
+        "instance_restarted": "インスタンスを再起動しました",
+        "instance_action_failed": "操作失敗: ",
     },
     "en": {
         "slogan": "No app. No new interface. Just email.",
@@ -469,8 +566,56 @@ I18N: dict[str, dict[str, str]] = {
         "stats_empty": "No stats yet. Records will appear after emails are processed.",
         "stats_no_data": "—",
         "skills_test_btn": "Test", "skills_test_payload": "Payload (JSON)",
+        "skills_test_params": "Parameters",
         "skills_test_run": "Run", "skills_test_cancel": "Cancel",
-        "skills_test_result": "Result",
+        "skills_test_result": "Result", "skills_test_fill_example": "Fill Example",
+        "skills_test_copy": "Copy",
+        "tasks_new_title": "New Task",
+        "tasks_edit_title": "Edit Task #",
+        "tasks_new_btn": "New Task",
+        "tasks_edit_btn": "Edit",
+        "tasks_cancel_btn": "Cancel",
+        "tasks_save_btn": "Save",
+        "tasks_field_subject": "Subject",
+        "tasks_field_body": "Body",
+        "tasks_field_type": "Type",
+        "tasks_field_schedule_at": "Run At",
+        "tasks_field_schedule_every": "Repeat Every",
+        "tasks_field_schedule_cron": "Cron Expression",
+        "tasks_field_task_type": "Task Type",
+        "tasks_field_task_payload": "Task Payload (JSON)",
+        "tasks_field_to": "Recipient",
+        "tasks_type_email": "Email",
+        "tasks_type_ai_job": "AI Job",
+        "tasks_type_weather": "Weather",
+        "tasks_type_news": "News",
+        "tasks_type_web_search": "Web Search",
+        "tasks_type_system_status": "System Status",
+        "tasks_type_report": "Report",
+        "tasks_type_mcp_call": "MCP Call",
+        "tasks_schedule_once": "Once",
+        "tasks_schedule_recurring": "Recurring",
+        "tasks_schedule_cron": "Cron",
+        "tasks_schedule_none": "None",
+        "tasks_confirm_edit": "Edit this task?",
+        "nav_instances": "Instances",
+        "instances_title": "Multi-Instance Management",
+        "instances_empty": "No multi-instance configuration detected",
+        "instances_hint": "Configure MAIL_SORT2_ADDRESS or MAIL_SORT3_ADDRESS in .env to enable multi-instances",
+        "instances_col_name": "Instance",
+        "instances_col_address": "Email Address",
+        "instances_col_status": "Status",
+        "instances_col_pid": "PID",
+        "instances_col_mailbox": "Mailbox",
+        "instances_col_ai": "AI Backend",
+        "instances_btn_start": "Start",
+        "instances_btn_stop": "Stop",
+        "instances_btn_restart": "Restart",
+        "instances_main": "Main Instance",
+        "instance_started": "Instance started",
+        "instance_stopped": "Instance stopped",
+        "instance_restarted": "Instance restarted",
+        "instance_action_failed": "Action failed: ",
     },
     "ko": {
         "slogan": "앱도, 새로운 인터페이스도 필요 없습니다. 오직 이메일뿐입니다.",
@@ -581,8 +726,56 @@ I18N: dict[str, dict[str, str]] = {
         "stats_empty": "통계 데이터 없음. 메일 처리 후 자동으로 기록됩니다.",
         "stats_no_data": "—",
         "skills_test_btn": "테스트", "skills_test_payload": "파라미터 (JSON)",
+        "skills_test_params": "파라미터 설명",
         "skills_test_run": "실행", "skills_test_cancel": "취소",
-        "skills_test_result": "실행 결과",
+        "skills_test_result": "실행 결과", "skills_test_fill_example": "예시 채우기",
+        "skills_test_copy": "복사",
+        "tasks_new_title": "새 작업",
+        "tasks_edit_title": "작업 편집 #",
+        "tasks_new_btn": "새 작업",
+        "tasks_edit_btn": "편집",
+        "tasks_cancel_btn": "취소",
+        "tasks_save_btn": "저장",
+        "tasks_field_subject": "제목",
+        "tasks_field_body": "내용",
+        "tasks_field_type": "유형",
+        "tasks_field_schedule_at": "실행 시각",
+        "tasks_field_schedule_every": "반복 간격",
+        "tasks_field_schedule_cron": "Cron 표현식",
+        "tasks_field_task_type": "작업 유형",
+        "tasks_field_task_payload": "작업 매개변수 (JSON)",
+        "tasks_field_to": "수신자",
+        "tasks_type_email": "이메일",
+        "tasks_type_ai_job": "AI 작업",
+        "tasks_type_weather": "날씨",
+        "tasks_type_news": "뉴스",
+        "tasks_type_web_search": "웹 검색",
+        "tasks_type_system_status": "시스템 상태",
+        "tasks_type_report": "보고서",
+        "tasks_type_mcp_call": "MCP 호출",
+        "tasks_schedule_once": "단일 실행",
+        "tasks_schedule_recurring": "반복 실행",
+        "tasks_schedule_cron": "Cron",
+        "tasks_schedule_none": "없음",
+        "tasks_confirm_edit": "이 작업을 편집하시겠습니까?",
+        "nav_instances": "인스턴스",
+        "instances_title": "멀티 인스턴스 관리",
+        "instances_empty": "멀티 인스턴스 설정이 감지되지 않았습니다",
+        "instances_hint": ".env에서 MAIL_SORT2_ADDRESS 또는 MAIL_SORT3_ADDRESS를 설정하여 멀티 인스턴스를 활성화하세요",
+        "instances_col_name": "인스턴스",
+        "instances_col_address": "이메일 주소",
+        "instances_col_status": "상태",
+        "instances_col_pid": "PID",
+        "instances_col_mailbox": "메일함",
+        "instances_col_ai": "AI 백엔드",
+        "instances_btn_start": "시작",
+        "instances_btn_stop": "정지",
+        "instances_btn_restart": "재시작",
+        "instances_main": "메인 인스턴스",
+        "instance_started": "인스턴스가 시작되었습니다",
+        "instance_stopped": "인스턴스가 정지되었습니다",
+        "instance_restarted": "인스턴스가 재시작되었습니다",
+        "instance_action_failed": "작업 실패: ",
     },
 }
 
@@ -590,6 +783,61 @@ I18N: dict[str, dict[str, str]] = {
 def get_ui_lang(request: Request) -> str:
     """Get UI language from session, falling back to env default."""
     return request.session.get("ui_lang", os.environ.get("WEBUI_LANG", "zh"))
+
+
+def _build_skill_examples() -> dict:
+    """构建每个技能的示例 payload 参数。"""
+    return {
+        "ai_job": {
+            "prompt": "请解释什么是 RESTful API，并用简单示例说明",
+            "lang": "中文"
+        },
+        "translate": {
+            "text": "Hello, how are you today?",
+            "target_lang": "中文",
+            "source_lang": "English"
+        },
+        "summarize": {
+            "text": "请提供一段需要摘要的长文本内容...",
+            "lang": "中文",
+            "max_length": 200
+        },
+        "news_briefing": {
+            "query": "人工智能",
+            "num_results": 5,
+            "lang": "中文",
+            "timeframe": "24h"
+        },
+        "code_review": {
+            "code": "def fibonacci(n):\n    if n <= 1: return n\n    return fibonacci(n-1) + fibonacci(n-2)",
+            "language": "Python"
+        },
+        "code_executor": {
+            "code": "print('Hello World')",
+            "language": "Python"
+        },
+        "shell_exec": {
+            "command": "echo 'Hello from MailMindHub'"
+        },
+        "calendar_skill": {
+            "action": "list",
+            "details": "本周的日程安排"
+        },
+        "github": {
+            "action": "list_issues",
+            "repo": "owner/repo",
+            "state": "open"
+        },
+        "ticket": {
+            "action": "create",
+            "title": "服务器 CPU 使用率过高",
+            "description": "监控显示服务器 CPU 持续 90%+ 使用率",
+            "priority": "high"
+        },
+        "invoice": {
+            "text": "请提供需要处理的发票信息..."
+        },
+    }
 
 
 def _ctx(request: Request, **extra) -> dict:
@@ -1216,12 +1464,309 @@ async def task_restart(request: Request, task_id: int, _auth=Depends(require_aut
     ))
 
 
+@app.get("/tasks/new", response_class=HTMLResponse)
+async def task_new_form(request: Request, _auth=Depends(require_auth)):
+    """Show form to create a new task."""
+    lang = get_ui_lang(request)
+    t = I18N.get(lang, I18N["zh"])
+    task_types = [
+        ("email", t.get("tasks_type_email", "Email")),
+        ("ai_job", t.get("tasks_type_ai_job", "AI Job")),
+        ("weather", t.get("tasks_type_weather", "Weather")),
+        ("news", t.get("tasks_type_news", "News")),
+        ("web_search", t.get("tasks_type_web_search", "Web Search")),
+        ("system_status", t.get("tasks_type_system_status", "System Status")),
+        ("report", t.get("tasks_type_report", "Report")),
+        ("mcp_call", t.get("tasks_type_mcp_call", "MCP Call")),
+    ]
+    schedule_modes = [
+        ("none", t.get("tasks_schedule_none", "None")),
+        ("once", t.get("tasks_schedule_once", "Once")),
+        ("recurring", t.get("tasks_schedule_recurring", "Recurring")),
+        ("cron", t.get("tasks_schedule_cron", "Cron")),
+    ]
+    return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+        request, task_types=task_types, schedule_modes=schedule_modes,
+        feedback=None, task=None,
+    ))
+
+
+@app.post("/tasks/create", response_class=HTMLResponse)
+async def task_create(request: Request, _auth=Depends(require_auth)):
+    """Create a new scheduled task."""
+    form = await request.form()
+    data = dict(form)
+    
+    subject = data.get("subject", "").strip()
+    body = data.get("body", "").strip()
+    to_email = data.get("to", "").strip()
+    task_type = data.get("task_type", "email").strip()
+    task_payload_str = data.get("task_payload", "").strip()
+    schedule_mode = data.get("schedule_mode", "none").strip()
+    schedule_at = data.get("schedule_at", "").strip()
+    schedule_every = data.get("schedule_every", "").strip()
+    schedule_cron = data.get("schedule_cron", "").strip()
+    
+    if not subject:
+        feedback = {"ok": False, "message": "Task subject is required"}
+        return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+            request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
+        ))
+    
+    # Parse task_payload JSON
+    task_payload = {}
+    if task_payload_str:
+        try:
+            task_payload = json.loads(task_payload_str)
+        except json.JSONDecodeError as e:
+            feedback = {"ok": False, "message": f"Invalid JSON payload: {e}"}
+            return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+                request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
+            ))
+    
+    # Build task data
+    task_data = {
+        "subject": subject,
+        "body": body,
+        "to": to_email,
+        "type": task_type,
+        "payload": json.dumps(task_payload) if task_payload else None,
+        "status": "pending",
+    }
+    
+    # Handle schedule mode
+    if schedule_mode == "once" and schedule_at:
+        try:
+            from datetime import datetime as dt
+            schedule_time = dt.fromisoformat(schedule_at).timestamp()
+            task_data["trigger_time"] = schedule_time
+        except Exception as e:
+            feedback = {"ok": False, "message": f"Invalid schedule time: {e}"}
+            return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+                request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
+            ))
+    elif schedule_mode == "recurring" and schedule_every:
+        # Parse schedule_every (e.g., "5m", "2h", "1d")
+        interval_seconds = 0
+        try:
+            s = schedule_every.lower()
+            if s.endswith('d'):
+                interval_seconds = int(s[:-1]) * 86400
+            elif s.endswith('h'):
+                interval_seconds = int(s[:-1]) * 3600
+            elif s.endswith('m'):
+                interval_seconds = int(s[:-1]) * 60
+            elif s.endswith('s'):
+                interval_seconds = int(s[:-1])
+            else:
+                interval_seconds = int(s)
+        except Exception:
+            feedback = {"ok": False, "message": "Invalid interval format (e.g., 5m, 2h, 1d)"}
+            return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+                request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
+            ))
+        task_data["interval_seconds"] = interval_seconds
+    elif schedule_mode == "cron" and schedule_cron:
+        task_data["cron_expr"] = schedule_cron
+    
+    # Insert into database
+    try:
+        with sqlite3.connect(str(DB_FILE)) as conn:
+            cursor = conn.execute(
+                """INSERT INTO tasks 
+                   (subject, body, to, type, payload, status, trigger_time, interval_seconds, cron_expr)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    task_data["subject"],
+                    task_data["body"],
+                    task_data["to"],
+                    task_data["type"],
+                    task_data.get("payload"),
+                    task_data["status"],
+                    task_data.get("trigger_time"),
+                    task_data.get("interval_seconds"),
+                    task_data.get("cron_expr"),
+                )
+            )
+            conn.commit()
+            task_id = cursor.lastrowid
+        
+        feedback = {"ok": True, "message": f"Task #{task_id} created successfully"}
+    except Exception as e:
+        feedback = {"ok": False, "message": f"Database error: {e}"}
+    
+    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+        request, tasks=get_tasks(), status_filter="all", feedback=feedback,
+    ))
+
+
+@app.get("/tasks/{task_id}/edit", response_class=HTMLResponse)
+async def task_edit_form(request: Request, task_id: int, _auth=Depends(require_auth)):
+    """Show form to edit an existing task."""
+    if not DB_FILE.exists():
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    try:
+        with sqlite3.connect(str(DB_FILE)) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+            task_row = cur.fetchone()
+        
+        if not task_row:
+            raise HTTPException(status_code=404, detail="Task not found")
+        
+        task = dict(task_row)
+        
+        lang = get_ui_lang(request)
+        t = I18N.get(lang, I18N["zh"])
+        task_types = [
+            ("email", t.get("tasks_type_email", "Email")),
+            ("ai_job", t.get("tasks_type_ai_job", "AI Job")),
+            ("weather", t.get("tasks_type_weather", "Weather")),
+            ("news", t.get("tasks_type_news", "News")),
+            ("web_search", t.get("tasks_type_web_search", "Web Search")),
+            ("system_status", t.get("tasks_type_system_status", "System Status")),
+            ("report", t.get("tasks_type_report", "Report")),
+            ("mcp_call", t.get("tasks_type_mcp_call", "MCP Call")),
+        ]
+        schedule_modes = [
+            ("none", t.get("tasks_schedule_none", "None")),
+            ("once", t.get("tasks_schedule_once", "Once")),
+            ("recurring", t.get("tasks_schedule_recurring", "Recurring")),
+            ("cron", t.get("tasks_schedule_cron", "Cron")),
+        ]
+        
+        return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+            request, task=task, task_types=task_types, schedule_modes=schedule_modes,
+            feedback=None,
+        ))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading task: {e}")
+
+
+@app.post("/tasks/{task_id}/update", response_class=HTMLResponse)
+async def task_update(request: Request, task_id: int, _auth=Depends(require_auth)):
+    """Update an existing scheduled task."""
+    form = await request.form()
+    data = dict(form)
+    
+    subject = data.get("subject", "").strip()
+    body = data.get("body", "").strip()
+    to_email = data.get("to", "").strip()
+    task_type = data.get("task_type", "email").strip()
+    task_payload_str = data.get("task_payload", "").strip()
+    schedule_mode = data.get("schedule_mode", "none").strip()
+    schedule_at = data.get("schedule_at", "").strip()
+    schedule_every = data.get("schedule_every", "").strip()
+    schedule_cron = data.get("schedule_cron", "").strip()
+    
+    if not subject:
+        feedback = {"ok": False, "message": "Task subject is required"}
+        return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+            request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
+        ))
+    
+    # Parse task_payload JSON
+    task_payload = {}
+    if task_payload_str:
+        try:
+            task_payload = json.loads(task_payload_str)
+        except json.JSONDecodeError as e:
+            feedback = {"ok": False, "message": f"Invalid JSON payload: {e}"}
+            return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+                request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
+            ))
+    
+    # Build update data
+    updates = {
+        "subject": subject,
+        "body": body,
+        "to": to_email,
+        "type": task_type,
+        "payload": json.dumps(task_payload) if task_payload else None,
+    }
+    
+    # Handle schedule mode
+    if schedule_mode == "once" and schedule_at:
+        try:
+            from datetime import datetime as dt
+            updates["trigger_time"] = dt.fromisoformat(schedule_at).timestamp()
+            updates["interval_seconds"] = None
+            updates["cron_expr"] = None
+        except Exception as e:
+            feedback = {"ok": False, "message": f"Invalid schedule time: {e}"}
+            return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+                request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
+            ))
+    elif schedule_mode == "recurring" and schedule_every:
+        interval_seconds = 0
+        try:
+            s = schedule_every.lower()
+            if s.endswith('d'):
+                interval_seconds = int(s[:-1]) * 86400
+            elif s.endswith('h'):
+                interval_seconds = int(s[:-1]) * 3600
+            elif s.endswith('m'):
+                interval_seconds = int(s[:-1]) * 60
+            elif s.endswith('s'):
+                interval_seconds = int(s[:-1])
+            else:
+                interval_seconds = int(s)
+        except Exception:
+            feedback = {"ok": False, "message": "Invalid interval format (e.g., 5m, 2h, 1d)"}
+            return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+                request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
+            ))
+        updates["interval_seconds"] = interval_seconds
+        updates["trigger_time"] = None
+        updates["cron_expr"] = None
+    elif schedule_mode == "cron" and schedule_cron:
+        updates["cron_expr"] = schedule_cron
+        updates["trigger_time"] = None
+        updates["interval_seconds"] = None
+    else:
+        updates["trigger_time"] = None
+        updates["interval_seconds"] = None
+        updates["cron_expr"] = None
+    
+    # Update database
+    try:
+        with sqlite3.connect(str(DB_FILE)) as conn:
+            conn.execute(
+                """UPDATE tasks 
+                   SET subject=?, body=?, to=?, type=?, payload=?, 
+                       trigger_time=?, interval_seconds=?, cron_expr=?
+                   WHERE id=?""",
+                (
+                    updates["subject"],
+                    updates["body"],
+                    updates["to"],
+                    updates["type"],
+                    updates.get("payload"),
+                    updates.get("trigger_time"),
+                    updates.get("interval_seconds"),
+                    updates.get("cron_expr"),
+                    task_id,
+                )
+            )
+            conn.commit()
+        
+        feedback = {"ok": True, "message": f"Task #{task_id} updated successfully"}
+    except Exception as e:
+        feedback = {"ok": False, "message": f"Database error: {e}"}
+    
+    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+        request, tasks=get_tasks(), status_filter="all", feedback=feedback,
+    ))
+
+
 @app.get("/tabs/skills", response_class=HTMLResponse)
 async def tab_skills(request: Request, _auth=Depends(require_auth)):
     from skills.loader import get_registry
     skills = list(get_registry().values())
+    examples = _build_skill_examples()
     return templates.TemplateResponse("partials/tab_skills.html", _ctx(
-        request, skills=skills, feedback=None,
+        request, skills=skills, feedback=None, skill_examples=examples,
     ))
 
 
@@ -1244,9 +1789,10 @@ async def api_skills_reload(request: Request, _auth=Depends(require_auth)):
     skills = list(reload_skills().values())
     lang = get_ui_lang(request)
     t = I18N.get(lang, I18N["zh"])
+    examples = _build_skill_examples()
     feedback = {"ok": True, "message": f"{t['skills_count_prefix']}{len(skills)}{t['skills_count_suffix']}"}
     return templates.TemplateResponse("partials/tab_skills.html", _ctx(
-        request, skills=skills, feedback=feedback,
+        request, skills=skills, feedback=feedback, skill_examples=examples,
     ))
 
 
@@ -1260,12 +1806,34 @@ async def api_skill_test(request: Request, skill_name: str, _auth=Depends(requir
     try:
         body = await request.json()
         payload = body.get("payload", {})
+        ai_name_override = body.get("ai")
     except Exception:
         payload = {}
+        ai_name_override = None
+
     try:
-        result = skill.run(payload)
+        from tasks.registry import pick_task_ai
+        from ai.providers import get_ai_provider
+        from core.config import AI_BACKENDS as CORE_AI_BACKENDS
+
+        if ai_name_override and ai_name_override in CORE_AI_BACKENDS:
+            ai_name = ai_name_override
+            backend = CORE_AI_BACKENDS[ai_name]
+        else:
+            ai_name, backend = pick_task_ai()
+
+        if not backend:
+            return {"ok": False, "error": "No AI backend available"}
+
+        provider = get_ai_provider(ai_name, backend)
+        
+        # 実際に AI を呼び出す（Executor で実行してイベントループをブロックしない）
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: skill.run(payload, ai_caller=provider))
+        
         return {"ok": True, "result": result}
     except Exception as e:
+        log.error(f"Skill test execution error: {e}")
         return {"ok": False, "error": str(e)}
 
 
@@ -1470,6 +2038,300 @@ async def daemon_action(request: Request, action: str, _auth=Depends(require_aut
 
     return templates.TemplateResponse("partials/header_status.html", _ctx(
         request, status=status, message=message, success=success,
+    ))
+
+
+# ─── Instance Management Routes ──────────────────────────────────────────────
+
+INSTANCE_SUFFIXES = ["", "2", "3"]  # Main, sort2, sort3
+
+
+def get_instance_pid_file(suffix: str) -> Path:
+    """Get PID file path for an instance."""
+    if suffix == "":
+        return PID_FILE
+    return ROOT / f"daemon{suffix}.pid"
+
+
+def get_instance_status(suffix: str) -> dict:
+    """Get status of an instance."""
+    pid_file = get_instance_pid_file(suffix)
+    status = {"running": False, "pid": None, "mailbox": "—", "ai": "—", "mode": "—", "address": "—"}
+    
+    if not pid_file.exists():
+        return status
+    
+    try:
+        pid_text = pid_file.read_text().strip()
+        if not pid_text:
+            return status
+        pid = int(pid_text)
+        os.kill(pid, 0)
+        status["running"] = True
+        status["pid"] = pid
+        
+        # Read env for display values - need to read instance-specific env
+        env = read_env()
+        
+        # Get instance-specific configuration
+        if suffix == "":
+            status["mailbox"] = env.get("MAILBOX", "?")
+            status["ai"] = env.get("AI", "?")
+            status["mode"] = env.get("MODE", "idle")
+            status["address"] = env.get("MAIL_SORT_ADDRESS", env.get("MAIL_ADDRESS", "—"))
+        else:
+            prefix = f"MAIL_SORT{suffix}"
+            status["mailbox"] = env.get(f"{prefix}_MAILBOX", env.get("MAILBOX", "?"))
+            status["ai"] = env.get(f"{prefix}_AI", env.get("AI", "?"))
+            status["mode"] = env.get(f"{prefix}_MODE", env.get("MODE", "idle"))
+            status["address"] = env.get(f"{prefix}_ADDRESS", "—")
+    except (ValueError, OSError, ProcessLookupError):
+        pass
+    
+    return status
+
+
+def get_all_instances() -> list[dict]:
+    """Get status of all configured instances."""
+    env = read_env()
+    instances = []
+    
+    # Check main instance
+    instances.append({
+        "name": "main",
+        "display_name": "主实例",
+        "suffix": "",
+        **get_instance_status("")
+    })
+    
+    # Check sort2 and sort3 instances
+    for suffix in ["2", "3"]:
+        prefix = f"MAIL_SORT{suffix}"
+        address = env.get(f"{prefix}_ADDRESS", "")
+        if address:  # Only include configured instances
+            instances.append({
+                "name": f"sort{suffix}",
+                "display_name": f"实例 {suffix}",
+                "suffix": suffix,
+                **get_instance_status(suffix)
+            })
+    
+    return instances
+
+
+@app.get("/tabs/instances", response_class=HTMLResponse)
+async def tab_instances(request: Request, _auth=Depends(require_auth)):
+    """Show multi-instance management page."""
+    instances = get_all_instances()
+    return templates.TemplateResponse("partials/tab_instances.html", _ctx(
+        request, instances=instances, feedback=None,
+    ))
+
+
+@app.post("/instances/{suffix}/{action}", response_class=HTMLResponse)
+async def instance_action(request: Request, suffix: str, action: str, _auth=Depends(require_auth)):
+    """Start/stop/restart an instance."""
+    if action not in ("start", "stop", "restart"):
+        return templates.TemplateResponse("partials/tab_instances.html", _ctx(
+            request, instances=get_all_instances(), 
+            feedback={"ok": False, "message": f"Unknown action: {action}"},
+        ))
+    
+    # Build manage.sh command with instance suffix
+    if suffix == "":
+        # Main instance
+        cmd = ["bash", str(ROOT / "manage.sh"), action]
+    else:
+        # Sort2/sort3 instance
+        instance_name = f"sort{suffix}"
+        cmd = ["bash", str(ROOT / "manage.sh"), "instance", action, instance_name]
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(ROOT),
+        )
+        raw_output = result.stdout + result.stderr
+        output = strip_ansi(raw_output).strip()
+        lines = [l.strip() for l in output.splitlines() if l.strip()]
+        message = lines[-1] if lines else f"{action} 完成"
+        if len(message) > 80:
+            message = message[:77] + "..."
+        success = result.returncode == 0
+    except subprocess.TimeoutExpired:
+        message = "操作超时"
+        success = False
+    except Exception as e:
+        message = str(e)
+        success = False
+    
+    await asyncio.sleep(0.8)
+    
+    lang = get_ui_lang(request)
+    t = I18N.get(lang, I18N["zh"])
+    
+    if success:
+        if action == "start":
+            feedback = {"ok": True, "message": t["instance_started"]}
+        elif action == "stop":
+            feedback = {"ok": True, "message": t["instance_stopped"]}
+        else:
+            feedback = {"ok": True, "message": t["instance_restarted"]}
+    else:
+        feedback = {"ok": False, "message": t["instance_action_failed"] + message}
+    
+    return templates.TemplateResponse("partials/tab_instances.html", _ctx(
+        request, instances=get_all_instances(), feedback=feedback,
+    ))
+
+
+# ─── Mail Template Push ──────────────────────────────────────────────────────
+
+@app.post("/mail/push-templates", response_class=HTMLResponse)
+async def mail_push_templates(request: Request, _auth=Depends(require_auth)):
+    """Push command templates to the management mailbox."""
+    try:
+        result = subprocess.run(
+            ["bash", str(ROOT / "manage.sh"), "push-templates"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(ROOT),
+        )
+        output = strip_ansi(result.stdout + result.stderr).strip()
+        lines = [l.strip() for l in output.splitlines() if l.strip()]
+        message = lines[-1] if lines else "模板推送完成"
+        if len(message) > 100:
+            message = message[:97] + "..."
+        success = result.returncode == 0
+    except subprocess.TimeoutExpired:
+        message = "推送超时"
+        success = False
+    except Exception as e:
+        message = str(e)
+        success = False
+    
+    env = read_env()
+    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+        request, env=env, mail_config=get_mail_config(env),
+        feedback={"ok": success, "message": message},
+    ))
+
+
+@app.post("/mail/push-templates-to", response_class=HTMLResponse)
+async def mail_push_templates_to_form(request: Request, _auth=Depends(require_auth)):
+    """Show form to push templates to a specific email."""
+    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+        request, env=read_env(), mail_config=get_mail_config(read_env()),
+        feedback=None, show_push_to_form=True,
+    ))
+
+
+@app.post("/mail/push-templates-to-submit", response_class=HTMLResponse)
+async def mail_push_templates_to_submit(request: Request, _auth=Depends(require_auth)):
+    """Push templates to a specific email address."""
+    form = await request.form()
+    target_email = form.get("target_email", "").strip()
+    
+    if not target_email or "@" not in target_email:
+        feedback = {"ok": False, "message": "请输入有效的邮箱地址"}
+        return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+            request, env=read_env(), mail_config=get_mail_config(read_env()),
+            feedback=feedback,
+        ))
+    
+    try:
+        result = subprocess.run(
+            ["bash", str(ROOT / "manage.sh"), "push-templates-to", target_email],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(ROOT),
+        )
+        output = strip_ansi(result.stdout + result.stderr).strip()
+        lines = [l.strip() for l in output.splitlines() if l.strip()]
+        message = lines[-1] if lines else f"模板已发送到 {target_email}"
+        if len(message) > 100:
+            message = message[:97] + "..."
+        success = result.returncode == 0
+    except subprocess.TimeoutExpired:
+        message = "推送超时"
+        success = False
+    except Exception as e:
+        message = str(e)
+        success = False
+    
+    env = read_env()
+    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+        request, env=env, mail_config=get_mail_config(env),
+        feedback={"ok": success, "message": message},
+    ))
+
+
+# ─── systemd Service Management ──────────────────────────────────────────────
+
+@app.post("/systemd/install", response_class=HTMLResponse)
+async def systemd_install(request: Request, _auth=Depends(require_auth)):
+    """Install systemd service."""
+    try:
+        result = subprocess.run(
+            ["bash", str(ROOT / "manage.sh"), "install"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(ROOT),
+        )
+        output = strip_ansi(result.stdout + result.stderr).strip()
+        lines = [l.strip() for l in output.splitlines() if l.strip()]
+        message = lines[-1] if lines else "systemd 服务安装完成"
+        if len(message) > 100:
+            message = message[:97] + "..."
+        success = result.returncode == 0
+    except subprocess.TimeoutExpired:
+        message = "安装超时"
+        success = False
+    except Exception as e:
+        message = str(e)
+        success = False
+    
+    env = read_env()
+    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+        request, env=env, mail_config=get_mail_config(env),
+        feedback={"ok": success, "message": message},
+    ))
+
+
+@app.post("/systemd/uninstall", response_class=HTMLResponse)
+async def systemd_uninstall(request: Request, _auth=Depends(require_auth)):
+    """Uninstall systemd service."""
+    try:
+        result = subprocess.run(
+            ["bash", str(ROOT / "manage.sh"), "uninstall"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(ROOT),
+        )
+        output = strip_ansi(result.stdout + result.stderr).strip()
+        lines = [l.strip() for l in output.splitlines() if l.strip()]
+        message = lines[-1] if lines else "systemd 服务已卸载"
+        if len(message) > 100:
+            message = message[:97] + "..."
+        success = result.returncode == 0
+    except subprocess.TimeoutExpired:
+        message = "卸载超时"
+        success = False
+    except Exception as e:
+        message = str(e)
+        success = False
+    
+    env = read_env()
+    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+        request, env=env, mail_config=get_mail_config(env),
+        feedback={"ok": success, "message": message},
     ))
 
 

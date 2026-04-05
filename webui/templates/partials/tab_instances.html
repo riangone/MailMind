@@ -1,0 +1,99 @@
+<div class="tab-body">
+
+  {% if feedback %}
+  <div class="feedback {{ 'ok' if feedback.ok else 'err' }}">
+    {{ feedback.message }}
+  </div>
+  {% endif %}
+
+  <div class="instances-header">
+    <h2>{{ t.instances_title }}</h2>
+  </div>
+
+  {% if instances %}
+  <div class="instances-table-wrap">
+    <table class="instances-table">
+      <thead>
+        <tr>
+          <th>{{ t.instances_col_name }}</th>
+          <th>{{ t.instances_col_address }}</th>
+          <th>{{ t.instances_col_status }}</th>
+          <th>{{ t.instances_col_pid }}</th>
+          <th>{{ t.instances_col_mailbox }}</th>
+          <th>{{ t.instances_col_ai }}</th>
+          <th>{{ t.tasks_col_actions }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for instance in instances %}
+        <tr>
+          <td>
+            <div class="instance-name">
+              {% if instance.suffix == "" %}
+                {{ t.instances_main }}
+              {% else %}
+                实例 {{ instance.suffix }}
+              {% endif %}
+            </div>
+          </td>
+
+          <td>
+            <div class="instance-address" title="{{ instance.address }}">
+              {{ instance.address }}
+            </div>
+          </td>
+
+          <td>
+            <span class="badge badge-{{ 'running' if instance.running else 'stopped' }}">
+              {{ "运行中" if instance.running else "已停止" }}
+            </span>
+          </td>
+
+          <td>
+            {% if instance.pid %}
+              <code>{{ instance.pid }}</code>
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
+          <td>
+            <span class="badge badge-{{ instance.mailbox }}">{{ instance.mailbox }}</span>
+          </td>
+
+          <td>
+            <span class="badge badge-ai">{{ instance.ai }}</span>
+          </td>
+
+          <td>
+            <div class="task-actions">
+              {% if not instance.running %}
+              <button class="btn-sm success"
+                      hx-post="/instances/{{ instance.suffix }}/start"
+                      hx-target="#content"
+                      hx-swap="innerHTML">{{ t.instances_btn_start }}</button>
+              {% else %}
+              <button class="btn-sm danger"
+                      hx-post="/instances/{{ instance.suffix }}/stop"
+                      hx-target="#content"
+                      hx-swap="innerHTML">{{ t.instances_btn_stop }}</button>
+              <button class="btn-sm"
+                      hx-post="/instances/{{ instance.suffix }}/restart"
+                      hx-target="#content"
+                      hx-swap="innerHTML">{{ t.instances_btn_restart }}</button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="tasks-empty">
+    {{ t.instances_empty }}<br>
+    <small>{{ t.instances_hint }}</small>
+  </div>
+  {% endif %}
+
+</div>

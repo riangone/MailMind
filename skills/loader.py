@@ -16,80 +16,102 @@ _loaded = False
 
 
 def _parse_yaml_frontmatter(text: str) -> dict:
-    """解析 YAML front matter"""
+    """解析 YAML front matter（简化版，支持嵌套字典/列表）"""
     match = re.match(r'^---\s*\n(.*?)\n---\s*\n(.*)$', text, re.DOTALL)
     if not match:
         return {}, text
-    
+
     yaml_str = match.group(1)
     body = match.group(2).strip()
-    
-    # 简单 YAML 解析（只支持基本类型）
-    meta = {}
-    current_key = None
-    
-    for line in yaml_str.strip().split('\n'):
-        # 跳过空行
-        if not line.strip():
+
+    def _parse_scalar(raw: str):
+        v = raw.strip()
+        if not v:
+            return ""
+        if v.startswith('[') and v.endswith(']'):
+            items = [x.strip().strip('"').strip("'") for x in v[1:-1].split(',') if x.strip()]
+            return items
+        if v.startswith('{') and v.endswith('}'):
+            inner = {}
+            for item in v[1:-1].split(','):
+                if ':' in item:
+                    ik, _, iv = item.partition(':')
+                    inner[ik.strip()] = iv.strip().strip('"').strip("'")
+            return inner
+        low = v.lower()
+        if low in ('true', 'yes'):
+            return True
+        if low in ('false', 'no'):
+            return False
+        if v.isdigit():
+            try:
+                return int(v)
+            except Exception:
+                return v
+        return v.strip('"').strip("'")
+
+    meta: dict = {}
+    # stack entries: (indent_level, container, pending_key)
+    stack = [(-1, meta, None)]
+
+    for raw_line in yaml_str.splitlines():
+        if not raw_line.strip():
             continue
-        
-        # 顶级键
-        if not line.startswith(' ') and not line.startswith('\t'):
-            if ':' in line:
-                key, _, value = line.partition(':')
-                key = key.strip()
-                value = value.strip()
-                
-                if value:
-                    # 简单值
-                    if value.startswith('[') and value.endswith(']'):
-                        # 列表
-                        items = [x.strip().strip('"').strip("'") for x in value[1:-1].split(',') if x.strip()]
-                        meta[key] = items
-                    elif value.lower() in ('true', 'yes'):
-                        meta[key] = True
-                    elif value.lower() in ('false', 'no'):
-                        meta[key] = False
-                    else:
-                        meta[key] = value.strip('"').strip("'")
-                else:
-                    # 可能是嵌套结构
-                    current_key = key
-                    meta[key] = None
-        elif current_key:
-            # 嵌套结构
-            stripped = line.strip()
-            if stripped.startswith('- '):
-                # 列表项
-                if meta[current_key] is None:
-                    meta[current_key] = []
-                if isinstance(meta[current_key], list):
-                    meta[current_key].append(stripped[2:].strip().strip('"').strip("'"))
-            elif ':' in stripped:
-                # 字典项
-                k, _, v = stripped.partition(':')
-                k = k.strip()
-                v = v.strip()
-                
-                if meta[current_key] is None:
-                    meta[current_key] = {}
-                
-                if isinstance(meta[current_key], dict):
-                    if v.startswith('{') and v.endswith('}'):
-                        # 内嵌字典
-                        inner = {}
-                        for item in v[1:-1].split(','):
-                            if ':' in item:
-                                ik, _, iv = item.partition(':')
-                                inner[ik.strip()] = iv.strip().strip('"').strip("'")
-                        meta[current_key][k] = inner
-                    elif v.lower() in ('true', 'yes'):
-                        meta[current_key][k] = True
-                    elif v.lower() in ('false', 'no'):
-                        meta[current_key][k] = False
-                    else:
-                        meta[current_key][k] = v.strip('"').strip("'")
-    
+        # Expand tabs to keep indentation consistent
+        line = raw_line.expandtabs(2)
+        indent = len(line) - len(line.lstrip(' '))
+        stripped = line.strip()
+
+        # Find current container based on indent
+        while stack and indent < stack[-1][0]:
+            stack.pop()
+        if not stack:
+            stack = [(-1, meta, None)]
+
+        parent_indent, parent_container, pending_key = stack[-1]
+
+        # If parent is waiting for a nested container, create it now
+        if pending_key is not None and indent > parent_indent:
+            new_container = [] if stripped.startswith('- ') else {}
+            if isinstance(parent_container, dict):
+                parent_container[pending_key] = new_container
+            stack[-1] = (parent_indent, parent_container, None)
+            stack.append((indent, new_container, None))
+            parent_container = new_container
+            parent_indent = indent
+
+        if stripped.startswith('- '):
+            item_raw = stripped[2:].strip()
+            if isinstance(parent_container, list):
+                parent_container.append(_parse_scalar(item_raw))
+            elif isinstance(parent_container, dict):
+                # Try to append to the last pending key if it exists
+                if stack[-1][2]:
+                    key = stack[-1][2]
+                    parent_container[key] = parent_container.get(key, [])
+                    if isinstance(parent_container[key], list):
+                        parent_container[key].append(_parse_scalar(item_raw))
+            continue
+
+        if ':' not in stripped:
+            continue
+        key, _, value = stripped.partition(':')
+        key = key.strip()
+        value = value.strip()
+
+        if not value:
+            # Defer container type (dict/list) to next indented line
+            stack[-1] = (parent_indent, parent_container, key)
+            continue
+
+        if isinstance(parent_container, dict):
+            parent_container[key] = _parse_scalar(value)
+
+    # Resolve any dangling pending keys as empty dicts
+    for indent, container, pending_key in stack:
+        if pending_key and isinstance(container, dict) and pending_key not in container:
+            container[pending_key] = {}
+
     return meta, body
 
 

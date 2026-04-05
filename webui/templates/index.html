@@ -98,6 +98,11 @@
           hx-swap="innerHTML"
           onclick="setTab(this)">{{ t.nav_stats }}</button>
   <button class="tab"
+          hx-get="/tabs/instances"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          onclick="setTab(this)">{{ t.nav_instances }}</button>
+  <button class="tab"
           hx-get="/tabs/logs"
           hx-target="#content"
           hx-swap="innerHTML"

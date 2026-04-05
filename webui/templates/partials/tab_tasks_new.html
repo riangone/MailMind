@@ -1,0 +1,98 @@
+<div class="tab-body">
+  <div class="task-form-header">
+    <button class="btn-back" hx-get="/tabs/tasks?status=all" hx-target="#content" hx-swap="innerHTML">
+      ← {{ t.tasks_filter_all }}
+    </button>
+    <h2>{{ t.tasks_new_title }}</h2>
+  </div>
+
+  {% if feedback %}
+  <div class="feedback {{ 'ok' if feedback.ok else 'err' }}">
+    {{ feedback.message }}
+  </div>
+  {% endif %}
+
+  <form class="task-form" hx-post="/tasks/create" hx-target="#content" hx-swap="innerHTML">
+    <!-- 基本信息 -->
+    <div class="form-group">
+      <label for="subject">{{ t.tasks_field_subject }} *</label>
+      <input type="text" id="subject" name="subject" required placeholder="任务主题">
+    </div>
+
+    <div class="form-group">
+      <label for="body">{{ t.tasks_field_body }}</label>
+      <textarea id="body" name="body" rows="4" placeholder="任务内容/指令"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="to">{{ t.tasks_field_to }}</label>
+      <input type="email" id="to" name="to" placeholder="收件人邮箱（可选）">
+    </div>
+
+    <div class="form-group">
+      <label for="task_type">{{ t.tasks_field_task_type }}</label>
+      <select id="task_type" name="task_type">
+        {% for value, label in task_types %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- 调度设置 -->
+    <fieldset class="form-fieldset">
+      <legend>调度设置</legend>
+      
+      <div class="form-group">
+        <label for="schedule_mode">调度模式</label>
+        <select id="schedule_mode" name="schedule_mode" onchange="toggleScheduleFields()">
+          {% for value, label in schedule_modes %}
+          <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group" id="schedule_at_group" style="display:none;">
+        <label for="schedule_at">{{ t.tasks_field_schedule_at }}</label>
+        <input type="datetime-local" id="schedule_at" name="schedule_at">
+      </div>
+
+      <div class="form-group" id="schedule_every_group" style="display:none;">
+        <label for="schedule_every">{{ t.tasks_field_schedule_every }}</label>
+        <input type="text" id="schedule_every" name="schedule_every" placeholder="例如：5m, 2h, 1d">
+        <small>格式：数字+单位（m=分钟, h=小时, d=天）</small>
+      </div>
+
+      <div class="form-group" id="schedule_cron_group" style="display:none;">
+        <label for="schedule_cron">{{ t.tasks_field_schedule_cron }}</label>
+        <input type="text" id="schedule_cron" name="schedule_cron" placeholder="例如：0 9 * * 1-5">
+        <small>Cron 表达式格式：分 时 日 月 星期</small>
+      </div>
+    </fieldset>
+
+    <!-- 任务参数 -->
+    <div class="form-group">
+      <label for="task_payload">{{ t.tasks_field_task_payload }}</label>
+      <textarea id="task_payload" name="task_payload" rows="3" placeholder='{"key": "value"}'></textarea>
+      <small>JSON 格式的任务参数（可选）</small>
+    </div>
+
+    <!-- 提交按钮 -->
+    <div class="form-actions">
+      <button type="button" class="btn-cancel" hx-get="/tabs/tasks?status=all" hx-target="#content" hx-swap="innerHTML">
+        {{ t.tasks_cancel_btn }}
+      </button>
+      <button type="submit" class="btn-primary">
+        {{ t.tasks_save_btn }}
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+function toggleScheduleFields() {
+  const mode = document.getElementById('schedule_mode').value;
+  document.getElementById('schedule_at_group').style.display = mode === 'once' ? 'block' : 'none';
+  document.getElementById('schedule_every_group').style.display = mode === 'recurring' ? 'block' : 'none';
+  document.getElementById('schedule_cron_group').style.display = mode === 'cron' ? 'block' : 'none';
+}
+</script>

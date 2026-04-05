@@ -51,26 +51,56 @@
         </tr>
         <!-- ── Inline test panel ──────────────────────────── -->
         <tr id="skill-test-{{ skill.name }}" style="display: none;">
-          <td colspan="4" style="padding: 8px 12px; background: var(--bg2); border-top: 1px solid var(--border);">
+          <td colspan="4" style="padding: 12px 16px; background: var(--bg2); border-top: 1px solid var(--border);">
+            <!-- 参数说明 -->
+            {% if skill.params %}
+            <div style="margin-bottom: 10px;">
+              <div style="font-size: 10px; color: var(--muted); margin-bottom: 6px; font-weight: 600;">{{ t.skills_test_params }}</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                {% for param_name, param_def in skill.params.items() %}
+                <span style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; padding: 3px 8px; font-size: 10px;">
+                  <code style="color: var(--cyan);">{{ param_name }}</code>
+                  <span style="color: var(--muted);">({{ param_def.type }}{% if param_def.get('required') %}<span style="color: var(--red);">*</span>{% endif %})</span>
+                  {% if param_def.get('description') %}
+                  <span style="color: var(--muted); font-style: italic;">— {{ param_def.description }}</span>
+                  {% endif %}
+                </span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Payload 输入 -->
             <div style="display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap;">
               <div style="flex: 1; min-width: 200px;">
-                <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">{{ t.skills_test_payload }}</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                  <span style="font-size: 10px; color: var(--muted);">{{ t.skills_test_payload }}</span>
+                  <button class="btn-sm" style="font-size: 9px; padding: 2px 6px;"
+                          onclick="fillSkillExample('{{ skill.name }}')">{{ t.skills_test_fill_example }}</button>
+                </div>
                 <textarea id="skill-payload-{{ skill.name }}"
-                          rows="3"
+                          rows="4"
                           placeholder="{}"
-                          style="width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--fg); font-family: var(--font); font-size: 11px; padding: 6px; border-radius: 3px; resize: vertical;">{}</textarea>
+                          style="width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--fg); font-family: var(--font-mono, monospace); font-size: 11px; padding: 6px; border-radius: 3px; resize: vertical;">{}</textarea>
               </div>
-              <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 18px;">
-                <button class="btn-sm"
+              <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 22px;">
+                <button class="btn-sm" style="background: var(--green); color: #fff;"
                         onclick="runSkillTest('{{ skill.name }}')">{{ t.skills_test_run }}</button>
                 <button class="btn-sm"
                         onclick="toggleSkillTest('{{ skill.name }}')">{{ t.skills_test_cancel }}</button>
               </div>
             </div>
-            <div id="skill-result-{{ skill.name }}" style="display:none; margin-top: 8px;">
-              <div style="font-size: 10px; color: var(--muted); margin-bottom: 4px;">{{ t.skills_test_result }}</div>
+
+            <!-- 执行结果 -->
+            <div id="skill-result-{{ skill.name }}" style="display:none; margin-top: 12px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <span style="font-size: 10px; color: var(--muted); font-weight: 600;">{{ t.skills_test_result }}</span>
+                <button class="btn-sm" style="font-size: 9px; padding: 2px 6px; display: none;"
+                        id="skill-result-copy-{{ skill.name }}"
+                        onclick="copySkillResult('{{ skill.name }}')">{{ t.skills_test_copy }}</button>
+              </div>
               <pre id="skill-result-body-{{ skill.name }}"
-                   style="background: var(--bg3); border: 1px solid var(--border); padding: 8px; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow-y: auto; border-radius: 3px; color: var(--log-fg);"></pre>
+                   style="background: var(--bg3); border: 1px solid var(--border); padding: 10px; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; border-radius: 4px; color: var(--log-fg); line-height: 1.5; min-height: 40px;"></pre>
             </div>
           </td>
         </tr>
@@ -84,12 +114,27 @@
 
 </div>
 
+<!-- 技能示例数据（由后端注入） -->
 <script>
+var SKILL_EXAMPLES = {{ skill_examples | tojson | default('{}') }};
+
 function toggleSkillTest(name) {
   var row = document.getElementById('skill-test-' + name);
   if (row) {
     row.style.display = (row.style.display === 'none') ? '' : 'none';
-    document.getElementById('skill-result-' + name).style.display = 'none';
+    var resultDiv = document.getElementById('skill-result-' + name);
+    if (resultDiv) resultDiv.style.display = 'none';
+  }
+}
+
+function fillSkillExample(name) {
+  var payloadEl = document.getElementById('skill-payload-' + name);
+  var example = SKILL_EXAMPLES[name];
+  if (example) {
+    payloadEl.value = JSON.stringify(example, null, 2);
+  } else {
+    // 根据 params 自动生成默认示例
+    payloadEl.value = JSON.stringify({}, null, 2);
   }
 }
 
@@ -97,31 +142,52 @@ function runSkillTest(name) {
   var payloadEl = document.getElementById('skill-payload-' + name);
   var resultDiv = document.getElementById('skill-result-' + name);
   var resultBody = document.getElementById('skill-result-body-' + name);
+  var copyBtn = document.getElementById('skill-result-copy-' + name);
   var payload = {};
   try { payload = JSON.parse(payloadEl.value || '{}'); } catch(e) {
-    resultBody.textContent = 'JSON parse error: ' + e.message;
+    resultBody.textContent = 'JSON 解析错误: ' + e.message;
     resultBody.style.color = 'var(--red)';
     resultDiv.style.display = '';
+    if (copyBtn) copyBtn.style.display = 'none';
     return;
   }
-  resultBody.textContent = '...';
+  resultBody.textContent = '⏳ 执行中...';
   resultBody.style.color = 'var(--log-fg)';
   resultDiv.style.display = '';
+  if (copyBtn) copyBtn.style.display = 'none';
+
   fetch('/api/skills/' + encodeURIComponent(name) + '/test', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({payload: payload})
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.ok) {
-      resultBody.textContent = data.result || '(empty result)';
+      resultBody.textContent = data.result || '(空结果)';
       resultBody.style.color = 'var(--log-fg)';
+      if (copyBtn) copyBtn.style.display = '';
     } else {
-      resultBody.textContent = 'Error: ' + (data.error || 'unknown');
+      resultBody.textContent = '错误: ' + (data.error || '未知错误');
       resultBody.style.color = 'var(--red)';
+      if (copyBtn) copyBtn.style.display = 'none';
     }
   }).catch(function(e) {
-    resultBody.textContent = 'Fetch error: ' + e.message;
+    resultBody.textContent = '网络错误: ' + e.message;
     resultBody.style.color = 'var(--red)';
+    if (copyBtn) copyBtn.style.display = 'none';
   });
+}
+
+function copySkillResult(name) {
+  var resultBody = document.getElementById('skill-result-body-' + name);
+  if (resultBody && resultBody.textContent) {
+    navigator.clipboard.writeText(resultBody.textContent).then(function() {
+      var copyBtn = document.getElementById('skill-result-copy-' + name);
+      if (copyBtn) {
+        var original = copyBtn.textContent;
+        copyBtn.textContent = '✓';
+        setTimeout(function() { copyBtn.textContent = original; }, 1500);
+      }
+    });
+  }
 }
 </script>

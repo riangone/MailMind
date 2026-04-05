@@ -58,9 +58,21 @@ class CLIProvider(AIBase):
                 _time.sleep(1)
                 elapsed = _time.time() - start
                 if timeout and elapsed > timeout:
-                    proc.kill(); proc.wait()
+                    proc.kill()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        pass
+                    # 关闭管道防止读线程永久阻塞
+                    try:
+                        if proc.stdout:
+                            proc.stdout.close()
+                        if proc.stderr:
+                            proc.stderr.close()
+                    except Exception:
+                        pass
                     return f"AI 出错：执行超时（{int(timeout)} 秒）"
-                if progress_cb and (elapsed - (last_progress - start)) >= progress_interval:
+                if progress_cb and progress_interval > 0 and (elapsed - last_progress) >= progress_interval:
                     progress_cb(int(elapsed))
                     last_progress = _time.time()
 

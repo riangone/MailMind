@@ -1,0 +1,124 @@
+<div class="tab-body">
+  <div class="task-form-header">
+    <button class="btn-back" hx-get="/tabs/tasks?status=all" hx-target="#content" hx-swap="innerHTML">
+      ← {{ t.tasks_filter_all }}
+    </button>
+    <h2>{{ t.tasks_edit_title }}{{ task.id if task else '' }}</h2>
+  </div>
+
+  {% if feedback %}
+  <div class="feedback {{ 'ok' if feedback.ok else 'err' }}">
+    {{ feedback.message }}
+  </div>
+  {% endif %}
+
+  {% if task %}
+  <form class="task-form" hx-post="/tasks/{{ task.id }}/update" hx-target="#content" hx-swap="innerHTML">
+    <!-- 基本信息 -->
+    <div class="form-group">
+      <label for="subject">{{ t.tasks_field_subject }} *</label>
+      <input type="text" id="subject" name="subject" value="{{ task.subject }}" required>
+    </div>
+
+    <div class="form-group">
+      <label for="body">{{ t.tasks_field_body }}</label>
+      <textarea id="body" name="body" rows="4">{{ task.body or '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="to">{{ t.tasks_field_to }}</label>
+      <input type="email" id="to" name="to" value="{{ task.to or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label for="task_type">{{ t.tasks_field_task_type }}</label>
+      <select id="task_type" name="task_type">
+        {% for value, label in task_types %}
+        <option value="{{ value }}" {% if task.type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- 调度设置 -->
+    <fieldset class="form-fieldset">
+      <legend>调度设置</legend>
+      
+      <div class="form-group">
+        <label for="schedule_mode">调度模式</label>
+        <select id="schedule_mode" name="schedule_mode" onchange="toggleScheduleFields()">
+          {% for value, label in schedule_modes %}
+          <option value="{{ value }}" 
+            {% if (value == 'once' and task.trigger_time) or 
+                  (value == 'recurring' and task.interval_seconds) or 
+                  (value == 'cron' and task.cron_expr) or 
+                  (value == 'none' and not task.trigger_time and not task.interval_seconds and not task.cron_expr) %}
+            selected
+            {% endif %}
+          >{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group" id="schedule_at_group" style="display:{% if task.trigger_time %}block{% else %}none{% endif %};">
+        <label for="schedule_at">{{ t.tasks_field_schedule_at }}</label>
+        <input type="datetime-local" id="schedule_at" name="schedule_at" 
+          value="{% if task.trigger_time %}{{ task.trigger_time | datetime('%Y-%m-%dT%H:%M') }}{% endif %}">
+      </div>
+
+      <div class="form-group" id="schedule_every_group" style="display:{% if task.interval_seconds %}block{% else %}none{% endif %};">
+        <label for="schedule_every">{{ t.tasks_field_schedule_every }}</label>
+        <input type="text" id="schedule_every" name="schedule_every" 
+          value="{% if task.interval_seconds %}
+            {% set s = task.interval_seconds | int %}
+            {% if s % 86400 == 0 %}{{ s // 86400 }}d
+            {% elif s % 3600 == 0 %}{{ s // 3600 }}h
+            {% elif s % 60 == 0 %}{{ s // 60 }}m
+            {% else %}{{ s }}s{% endif %}
+          {% endif %}"
+          placeholder="例如：5m, 2h, 1d">
+        <small>格式：数字+单位（m=分钟, h=小时, d=天）</small>
+      </div>
+
+      <div class="form-group" id="schedule_cron_group" style="display:{% if task.cron_expr %}block{% else %}none{% endif %};">
+        <label for="schedule_cron">{{ t.tasks_field_schedule_cron }}</label>
+        <input type="text" id="schedule_cron" name="schedule_cron" 
+          value="{{ task.cron_expr or '' }}"
+          placeholder="例如：0 9 * * 1-5">
+        <small>Cron 表达式格式：分 时 日 月 星期</small>
+      </div>
+    </fieldset>
+
+    <!-- 任务参数 -->
+    <div class="form-group">
+      <label for="task_payload">{{ t.tasks_field_task_payload }}</label>
+      <textarea id="task_payload" name="task_payload" rows="3" 
+        placeholder='{"key": "value"}'>{% if task.payload %}{{ task.payload }}{% endif %}</textarea>
+      <small>JSON 格式的任务参数（可选）</small>
+    </div>
+
+    <!-- 提交按钮 -->
+    <div class="form-actions">
+      <button type="button" class="btn-cancel" hx-get="/tabs/tasks?status=all" hx-target="#content" hx-swap="innerHTML">
+        {{ t.tasks_cancel_btn }}
+      </button>
+      <button type="submit" class="btn-primary">
+        {{ t.tasks_save_btn }}
+      </button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<script>
+function toggleScheduleFields() {
+  const mode = document.getElementById('schedule_mode').value;
+  document.getElementById('schedule_at_group').style.display = mode === 'once' ? 'block' : 'none';
+  document.getElementById('schedule_every_group').style.display = mode === 'recurring' ? 'block' : 'none';
+  document.getElementById('schedule_cron_group').style.display = mode === 'cron' ? 'block' : 'none';
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+  toggleScheduleFields();
+});
+</script>

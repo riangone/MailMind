@@ -26,7 +26,7 @@ def smtp_login(mailbox: dict):
         server.ehlo()
         server.starttls()
     auth = mailbox.get("auth", "password")
-    if auth == "password":
+    if auth in ("password", "app_password"):
         server.login(mailbox["address"], mailbox["password"])
     else:
         token = get_oauth_token(mailbox)
@@ -86,6 +86,8 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
             {footer_html}
             </body></html>"""
             alt_part.attach(MIMEText(full_body_html, "html", "utf-8"))
+        except ImportError as e:
+            log.warning(f"Markdown 扩展加载失败 ({e})，降级为纯文本")
         except Exception as e:
             log.warning(f"Markdown 转换失败: {e}")
             

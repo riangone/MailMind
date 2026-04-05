@@ -343,6 +343,89 @@
       <div class="hint">{{ t.workspace_dir_hint }}</div>
     </div>
 
+    <!-- ── MCP Servers ─────────────────────────────────────────── -->
+    <div class="section-title">MCP Servers</div>
+
+    <div class="form-group">
+      <label>MCP 服务器列表（MCP_SERVERS）</label>
+      <input type="text" name="MCP_SERVERS"
+             value="{{ env.get('MCP_SERVERS', '') }}"
+             placeholder="filesystem,github,sqlite">
+      <div class="hint">逗号分隔的 MCP 服务器名称列表</div>
+    </div>
+
+    {% for i in range(10) %}
+    {% set server_name = env.get('MCP_SERVERS', '').split(',')[i] if env.get('MCP_SERVERS') else '' %}
+    {% if server_name.strip() %}
+    <div class="form-group">
+      <label>MCP_SERVER_{{ server_name.strip().upper() }}</label>
+      <input type="text" name="MCP_SERVER_{{ server_name.strip().upper() }}"
+             value="{{ env.get('MCP_SERVER_' + server_name.strip().upper(), '') }}"
+             placeholder="npx -y @modelcontextprotocol/server-{{ server_name.strip() }}">
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- ── CLI Timeouts & Progress ─────────────────────────────── -->
+    <div class="section-title">CLI 超时与进度</div>
+
+    <div class="form-group">
+      <label>CLI 超时秒数（AI_CLI_TIMEOUT）</label>
+      <input type="number" name="AI_CLI_TIMEOUT"
+             value="{{ env.get('AI_CLI_TIMEOUT', '120') }}"
+             min="30" max="600">
+      <div class="hint">CLI AI 命令的最大等待秒数，默认 120</div>
+    </div>
+
+    <div class="form-group">
+      <label>进度报告间隔（AI_PROGRESS_INTERVAL）</label>
+      <input type="number" name="AI_PROGRESS_INTERVAL"
+             value="{{ env.get('AI_PROGRESS_INTERVAL', '30') }}"
+             min="10" max="300">
+      <div class="hint">长时间任务发送进度邮件的间隔秒数，默认 30</div>
+    </div>
+
+    <!-- ── Processing Limits ───────────────────────────────────── -->
+    <div class="section-title">处理限制</div>
+
+    <div class="form-group">
+      <label>已处理 ID 最大数量（MAX_PROCESSED_IDS）</label>
+      <input type="number" name="MAX_PROCESSED_IDS"
+             value="{{ env.get('MAX_PROCESSED_IDS', '10000') }}"
+             min="1000" max="100000">
+      <div class="hint">processed_ids 文件保留的最大邮件 ID 数量，默认 10000</div>
+    </div>
+
+    <!-- ── Channel Polling ─────────────────────────────────────── -->
+    <div class="section-title">通道轮询</div>
+
+    <div class="form-group">
+      <label>通道轮询间隔（CHANNEL_POLL_INTERVAL）</label>
+      <input type="number" name="CHANNEL_POLL_INTERVAL"
+             value="{{ env.get('CHANNEL_POLL_INTERVAL', '30') }}"
+             min="5" max="300">
+      <div class="hint">Telegram/Discord 等通道的轮询间隔秒数，默认 30</div>
+    </div>
+
+    <!-- ── Email Sort Folders ──────────────────────────────────── -->
+    <div class="section-title">邮件分类文件夹</div>
+
+    <div class="form-group">
+      <label>垃圾邮件文件夹（SPAM_FOLDER）</label>
+      <input type="text" name="SPAM_FOLDER"
+             value="{{ env.get('SPAM_FOLDER', 'Junk') }}"
+             placeholder="Junk">
+      <div class="hint">邮件整理时识别为垃圾邮件的文件夹名称</div>
+    </div>
+
+    <div class="form-group">
+      <label>回收站文件夹（TRASH_FOLDER）</label>
+      <input type="text" name="TRASH_FOLDER"
+             value="{{ env.get('TRASH_FOLDER', 'Trash') }}"
+             placeholder="Trash">
+      <div class="hint">邮件整理时删除邮件的目标文件夹</div>
+    </div>
+
     <div style="margin-top: 28px;">
       <button type="submit" class="btn">{{ t.btn_save_ai }}</button>
     </div>

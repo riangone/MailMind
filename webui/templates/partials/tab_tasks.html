@@ -61,6 +61,14 @@
   </div>
   {% endif %}
 
+  <!-- ── New task button ───────────────────────────────────── -->
+  <div class="tasks-actions-bar">
+    <button class="btn-primary"
+            hx-get="/tasks/new"
+            hx-target="#content"
+            hx-swap="innerHTML">{{ t.tasks_new_btn }}</button>
+  </div>
+
   <!-- ── Task list ────────────────────────────────────────────── -->
   {% if tasks %}
   <div class="tasks-table-wrap">
@@ -126,6 +134,11 @@
 
           <td>
             <div class="task-actions">
+              <button class="btn-sm"
+                      hx-get="/tasks/{{ task.id }}/edit"
+                      hx-target="#content"
+                      hx-swap="innerHTML"
+                      hx-confirm="{{ t.tasks_confirm_edit }}">{{ t.tasks_edit_btn }}</button>
               {% if task.status in ('pending', 'paused', 'failed', 'completed') %}
               <button class="btn-sm"
                       hx-post="/tasks/{{ task.id }}/trigger"

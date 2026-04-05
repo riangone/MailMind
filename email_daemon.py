@@ -18,9 +18,9 @@ from typing import Optional
 # 核心配置与模块
 from core.config import MAILBOXES, AI_BACKENDS, POLL_INTERVAL, DEFAULT_TASK_AI, PROMPT_TEMPLATE, PROMPT_TEMPLATES, AI_CONCURRENCY, AI_MODIFY_SUBJECT, PROMPT_LANG, MAX_EMAIL_CHARS, WORKSPACE_DIR, SHOW_FILE_CHANGES, AI_CLI_TIMEOUT, AI_PROGRESS_INTERVAL
 from core.validator import validate_config
-from core.mail_client import fetch_unread_emails, imap_login, fetch_thread_context, push_templates_to_mailbox
+from core.mail_client import fetch_unread_emails, imap_login, fetch_thread_context, push_templates_to_mailbox, get_oauth_token
 from core.mail_sender import send_reply, archive_output
-from core.prompts import HELP_BODY
+from core.prompts import HELP_BODY, TEMPLATES
 from ai.providers import get_ai_provider
 from utils.parser import parse_ai_response, trim_email_body, detect_lang
 from utils.logger import log
@@ -56,6 +56,12 @@ signal.signal(signal.SIGINT, _handle_signal)
 # 已处理 ID 路径
 PROCESSED_IDS_PATH: Optional[str] = None
 processed_ids: set = set()
+_ids_lock = threading.Lock()  # 保护 processed_ids 的 check-and-add 原子性
+
+# 批量写入优化：减少磁盘写入频率
+_SAVE_INTERVAL = 30  # 最少 30 秒保存一次
+_last_save_time = 0.0
+_pending_save_count = 0
 
 def _default_processed_ids_path(mailbox_name: str) -> str:
     return os.path.join(os.path.dirname(__file__), f"processed_ids_{mailbox_name}.json")
@@ -73,16 +79,37 @@ def load_processed_ids(path: str) -> set:
         log.warning(f"读取 processed_ids 失败：{e}")
         return set()
 
-def save_processed_ids(path: str, ids: set):
+def save_processed_ids(path: str, ids: set, force: bool = False):
+    """Save processed IDs to disk with debouncing to reduce I/O."""
+    global _last_save_time, _pending_save_count
     if not path: return
+    
+    now = time.time()
+    _pending_save_count += 1
+    
+    # 仅在强制保存或达到时间间隔时才写入磁盘
+    if not force and (now - _last_save_time) < _SAVE_INTERVAL and _pending_save_count < 50:
+        return
+    
+    _last_save_time = now
+    _pending_save_count = 0
+    
     try:
-        # Trim to most recent _MAX_PROCESSED_IDS entries (by sort order as proxy)
-        trimmed = sorted(ids)[-_MAX_PROCESSED_IDS:]
+        with _ids_lock:
+            trimmed = sorted(ids)[-_MAX_PROCESSED_IDS:]
         with open(path + ".tmp", "w", encoding="utf-8") as f:
             json.dump(trimmed, f, indent=2)
         os.replace(path + ".tmp", path)
     except Exception as e:
         log.warning(f"保存 processed_ids 失败：{e}")
+
+def mark_processed_id(eid: str) -> bool:
+    """线程安全地标记邮件为已处理。返回 True 表示新标记，False 表示已存在。"""
+    with _ids_lock:
+        if eid in processed_ids:
+            return False
+        processed_ids.add(eid)
+        return True
 
 # ────────────────────────────────────────────────────────────────
 
@@ -152,12 +179,17 @@ def _get_git_diff_summary(workspace_dir: str) -> str:
 def process_email(mailbox_name, ai_name, backend, em):
     try:
         _process_email_impl(mailbox_name, ai_name, backend, em)
+    except (ConnectionError, TimeoutError, OSError) as e:
+        # 可重试错误（网络/超时），不标记为已处理，下次轮询会重试
+        import traceback
+        log.warning(f"处理邮件失败（可重试）：{e}")
+        log.warning(traceback.format_exc())
     except Exception as e:
+        # 不可重试错误（解析错误、逻辑错误等），标记为已处理避免无限循环
         import traceback
         log.error(f"处理邮件失败：{e}")
         log.error(traceback.format_exc())
-        # 即使失败也标记为已处理，避免无限重试
-        processed_ids.add(em["id"])
+        mark_processed_id(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
 
 def _process_email_impl(mailbox_name, ai_name, backend, em):
@@ -230,7 +262,7 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
             "ko": "AI 처리 실패, 잠시 후 다시 시도해 주세요.",
         }.get(lang, "AI 处理失败，请稍后重试。")
         send_reply(MAILBOXES[mailbox_name], em["from_email"], em["subject"], err_msg, em.get("message_id"), lang=lang)
-        processed_ids.add(em["id"])
+        mark_processed_id(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
         return
     scheduler.record_stat(mailbox_name, "success", _ai_ms, em.get("subject"))
@@ -257,7 +289,7 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
                     result = {"zh": "操作已取消。", "ja": "操作をキャンセルしました。", "en": "Operation cancelled.", "ko": "작업이 취소되었습니다."}.get(lang, "操作已取消。")
                     reply_sub = {"zh": "邮件整理：已取消", "ja": "メール整理：キャンセル済み", "en": "Email organization: cancelled", "ko": "이메일 정리: 취소됨"}.get(lang, "邮件整理：已取消")
                 send_reply(MAILBOXES[mailbox_name], em["from_email"], reply_sub, result, em.get("message_id"), lang=lang)
-                processed_ids.add(em["id"])
+                mark_processed_id(em["id"])
                 save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
                 return
 
@@ -266,7 +298,7 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
         log.info("📋 检测到帮助请求，回复模板列表")
         help_body = HELP_BODY.get(lang, HELP_BODY["zh"])
         send_reply(MAILBOXES[mailbox_name], em["from_email"], "MailMindHub 使用模板", help_body, em.get("message_id"), lang=lang)
-        processed_ids.add(em["id"])
+        mark_processed_id(em["id"])
         save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
         return
 
@@ -381,7 +413,7 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
                 reply_body = (reply_body or "") + f"\n\n---\n{diff_label}：\n```\n{diff_summary}\n```"
         send_reply(MAILBOXES[mailbox_name], em["from_email"], sub, reply_body, em.get("message_id"), atts, lang=lang)
 
-    processed_ids.add(em["id"])
+    mark_processed_id(em["id"])
     save_processed_ids(PROCESSED_IDS_PATH, processed_ids)
 
 def _channel_reply(em: dict, subject: str, body: str):
@@ -474,7 +506,9 @@ def run_channel_loop(channel, ai_name: str, backend: dict):
                 executor.submit(process_channel_message, channel.name, ai_name, backend, em)
             # Persist processed IDs (keep last 2000)
             if len(ch_processed) > 2000:
-                ch_processed = set(list(ch_processed)[-2000:])
+                # 使用 heapq 保留最新的 2000 个（按哈希值排序，确保确定性）
+                import heapq
+                ch_processed = set(heapq.nlargest(2000, ch_processed, key=lambda x: hash(x)))
             with open(channel_ids_file, "w") as f:
                 json.dump(list(ch_processed), f)
         except Exception as e:
@@ -489,13 +523,17 @@ def run_poll(mailbox_name, ai_name, backend):
     retries = 0
     while True:
         try:
-            for em in fetch_unread_emails(mailbox, processed_ids):
+            for em in fetch_unread_emails(mailbox, processed_ids, _ids_lock):
                 executor.submit(process_email, mailbox_name, ai_name, backend, em)
             retries = 0 # 成功后重置
         except Exception as e:
             retries += 1
             wait_time = min(2 ** retries, 300)
-            log.error(f"轮询异常: {e}。{wait_time} 秒后重试 ({retries})...")
+            # Use warning for network-related timeouts, error for others
+            if "timeout" in str(e).lower() or "ssl" in str(e).lower():
+                log.warning(f"[Poll] 网络异常: {e}。{wait_time} 秒后重试 ({retries})...")
+            else:
+                log.error(f"[Poll] 严重异常: {e}。{wait_time} 秒后重试 ({retries})...")
             time.sleep(wait_time)
             continue
         time.sleep(interval)
@@ -513,7 +551,7 @@ def run_idle(mailbox_name, ai_name, backend):
     while True:
         try:
             with imapclient.IMAPClient(mailbox["imap_server"], ssl=True, timeout=60) as client:
-                if mailbox.get("auth") == "password":
+                if mailbox.get("auth") in ("password", "app_password"):
                     client.login(mailbox["address"], mailbox["password"])
                 else:
                     client.oauth2_login(mailbox["address"], get_oauth_token(mailbox))
@@ -529,7 +567,7 @@ def run_idle(mailbox_name, ai_name, backend):
                 log.info(f"✅ {mailbox_name} IDLE 就绪")
                 retries = 0 # 重置重试计数
                 while True:
-                    for em in fetch_unread_emails(mailbox, processed_ids):
+                    for em in fetch_unread_emails(mailbox, processed_ids, _ids_lock, existing_conn=client):
                         executor.submit(process_email, mailbox_name, ai_name, backend, em)
                     client.idle()
                     client.idle_check(timeout=300)
@@ -537,7 +575,11 @@ def run_idle(mailbox_name, ai_name, backend):
         except Exception as e:
             retries += 1
             wait_time = min(2 ** retries, 300) # 指数退避，最高 5 分钟
-            log.error(f"IDLE 异常: {e}。{wait_time} 秒后重试 ({retries})...")
+            # Use warning for common network timeouts
+            if "timeout" in str(e).lower() or "ssl" in str(e).lower():
+                log.warning(f"[IDLE] 网络连接异常: {e}。{wait_time} 秒后重试 ({retries})...")
+            else:
+                log.error(f"[IDLE] 严重异常: {e}。{wait_time} 秒后重试 ({retries})...")
             time.sleep(wait_time)
 
 def run_gmail_push(mailbox_name: str, ai_name: str, backend: dict):
@@ -618,8 +660,10 @@ def run_gmail_push(mailbox_name: str, ai_name: str, backend: dict):
 
         for msg_id in new_msg_ids:
             uid = f"gmail_api:{msg_id}"
-            if uid in processed_ids:
-                continue
+            with _ids_lock:
+                if uid in processed_ids:
+                    continue
+                processed_ids.add(uid)
             em = gmail_get_message(mailbox, msg_id)
             if em is None:
                 continue
@@ -627,9 +671,22 @@ def run_gmail_push(mailbox_name: str, ai_name: str, backend: dict):
             allowed = mailbox.get("allowed_senders", [])
             if allowed and em["from_email"] not in allowed:
                 log.debug(f"[GmailPush] 忽略非白名单发件人: {em['from_email']}")
-                processed_ids.add(uid)
+                mark_processed_id(uid)
                 continue
             executor.submit(process_email, mailbox_name, ai_name, backend, em)
+
+
+def send_templates_to_address(mailbox: dict, to_email: str, lang: str = "zh") -> int:
+    """Send template emails via SMTP to a specific email address."""
+    templates = TEMPLATES.get(lang, TEMPLATES["zh"])
+    count = 0
+    for subject, body in templates:
+        try:
+            send_reply(mailbox, to_email, subject, body, lang=lang)
+            count += 1
+        except Exception as e:
+            log.error(f"发送模板邮件失败 ({subject}): {e}")
+    return count
 
 
 def main():
@@ -676,7 +733,7 @@ def main():
     PROCESSED_IDS_PATH = _default_processed_ids_path(args.mailbox)
     processed_ids = load_processed_ids(PROCESSED_IDS_PATH)
 
-    threading.Thread(target=scheduler.run_forever, daemon=True).start()
+    threading.Thread(target=scheduler.run_forever, args=(_shutdown_event,), daemon=True).start()
 
     # Start enabled messaging channel adapters
     try:

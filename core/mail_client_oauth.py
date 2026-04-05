@@ -1,6 +1,15 @@
 import os
+import stat
 import base64
 from utils.logger import log
+
+def _secure_write_token(token_file: str, content: str):
+    """Write token file with restrictive permissions (owner read/write only)."""
+    fd = os.open(token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, stat.S_IRUSR | stat.S_IWUSR)
+    try:
+        os.write(fd, content.encode("utf-8"))
+    finally:
+        os.close(fd)
 
 def _oauth_google(mailbox: dict) -> str:
     from google.auth.transport.requests import Request
@@ -18,8 +27,7 @@ def _oauth_google(mailbox: dict) -> str:
             print(f"\nGmail OAuth 授权链接：\n{auth_url}\n请输入 code:")
             flow.fetch_token(code=input(">>> ").strip())
             creds = flow.credentials
-        with open(token_file, "w") as f:
-            f.write(creds.to_json())
+        _secure_write_token(token_file, creds.to_json())
     return creds.token
 
 def _oauth_microsoft(mailbox: dict) -> str:
@@ -37,8 +45,7 @@ def _oauth_microsoft(mailbox: dict) -> str:
         print(f"\nOutlook OAuth 授权：{flow['verification_uri']} 代码：{flow['user_code']}")
         result = app.acquire_token_by_device_flow(flow)
     if cache.has_state_changed:
-        with open(token_file, "w") as f:
-            f.write(cache.serialize())
+        _secure_write_token(token_file, cache.serialize())
     return result["access_token"]
 
 def get_oauth_token(mailbox: dict) -> str:

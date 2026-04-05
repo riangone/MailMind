@@ -17,7 +17,6 @@ MAX_TASK_RETRIES = int(os.environ.get("TASK_MAX_RETRIES", 3))
 class TaskScheduler:
     def __init__(self, db_path="tasks.db"):
         self.db_path = os.path.join(os.path.dirname(__file__), "..", db_path)
-        self.lock = threading.Lock()
         self._init_db()
 
     def _init_db(self):
@@ -143,14 +142,22 @@ class TaskScheduler:
             if trigger_time is None:
                 raise ValueError("schedule_at/schedule_cron 无法解析")
 
+            # 验证 JSON 可序列化
+            try:
+                payload_json = json.dumps(task_payload or {})
+                output_json = json.dumps(output or {})
+                attachments_json = json.dumps(attachments or [])
+            except (TypeError, ValueError) as e:
+                raise ValueError(f"task_payload/output/attachments 包含不可序列化的数据类型: {e}")
+
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute("""
                     INSERT INTO tasks (mailbox_name, "to", subject, body, trigger_time, interval_seconds, until_time, cron_expr, type, payload, output, attachments, in_reply_to, lang)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     mailbox_name, to, subject, body, trigger_time, interval, until_ts, cron_expr,
-                    task_type or "email", json.dumps(task_payload or {}),
-                    json.dumps(output or {}), json.dumps(attachments or []), in_reply_to, lang
+                    task_type or "email", payload_json,
+                    output_json, attachments_json, in_reply_to, lang
                 ))
             log.info(f"📅 任务已存入数据库：[{subject}] 将在 {datetime.fromtimestamp(trigger_time)} 发送")
             return True
@@ -261,16 +268,19 @@ class TaskScheduler:
             cur = conn.execute(sql, params)
             return cur.rowcount
 
-    def run_forever(self):
+    def run_forever(self, shutdown_event=None):
         log.info("⏰ 任务调度器已启动 (SQLite)")
         while True:
+            if shutdown_event and shutdown_event.is_set():
+                log.info("⏰ 任务调度器收到退出信号，正在停止...")
+                break
             now = time.time()
             try:
                 with sqlite3.connect(self.db_path) as conn:
                     conn.row_factory = sqlite3.Row
                     cursor = conn.execute("SELECT * FROM tasks WHERE trigger_time <= ? AND status = 'pending'", (now,))
                     due_tasks = cursor.fetchall()
-                    
+
                     for t in due_tasks:
                         task_dict = dict(t)
                         # Mark as processing to avoid double execution
