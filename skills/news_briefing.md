@@ -20,15 +20,18 @@ params:
   num_results:
     type: integer
     required: false
+    default: 5
     description: 结果数量（默认 5）
   lang:
     type: string
     required: false
+    default: ""
     description: 输出语言（可选）
   timeframe:
     type: string
     required: false
-    description: 时间范围（如 24h, 7d）
+    default: 最新
+    description: 时间范围（如 24h, 7d；默认最新）
 ---
 
 # 新闻简报

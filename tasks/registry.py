@@ -173,7 +173,9 @@ def execute_task_logic(task: Dict[str, Any], lang: str = "zh", progress_cb=None)
         if not is_valid:
             body = f"⚠️ 参数验证失败: {error_msg}"
         else:
-            body = skill.run(payload)
+            ai_name, backend = pick_task_ai(payload)
+            ai = get_ai_provider(ai_name, backend)
+            body = skill.run(payload, ai_caller=ai)
         subject = subject or f"Skill: {effective_task_type}"
 
     # 5. 其他所有任务：使用增强版 AI 执行框架

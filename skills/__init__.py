@@ -87,9 +87,19 @@ class MDSkill(BaseSkill):
         return True, ""
     
     def _render_instruction(self, payload: dict) -> str:
+        import re
         result = self.instruction
         for key, value in payload.items():
             result = result.replace(f"{{{{{key}}}}}", str(value))
+        # Replace any unfilled placeholders with defaults from params spec, or empty string
+        def _fill_default(match):
+            key = match.group(1)
+            spec = (self.params or {}).get(key, {})
+            if isinstance(spec, dict) and "default" in spec:
+                default = spec["default"]
+                return str(default) if default is not None else ""
+            return ""
+        result = re.sub(r'\{\{(\w+)\}\}', _fill_default, result)
         return result
 
 

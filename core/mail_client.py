@@ -255,9 +255,12 @@ def fetch_unread_emails(mailbox: dict, processed_ids: set, ids_lock=None, existi
                 if not msg_bytes: continue
                 msg = email.message_from_bytes(msg_bytes)
                 body, atts = get_body_and_attachments(msg)
+                from_raw = decode_str(msg.get("From", ""))
+                _, from_addr = parseaddr(from_raw)
                 emails.append({
                     "id": eid,
-                    "from": decode_str(msg.get("From", "")),
+                    "from": from_raw,
+                    "from_email": from_addr or from_raw,
                     "subject": decode_str(msg.get("Subject", "(无主题)")),
                     "message_id": msg.get("Message-ID", ""),
                     "body": body,
