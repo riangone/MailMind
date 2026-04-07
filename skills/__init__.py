@@ -62,8 +62,24 @@ class MDSkill(BaseSkill):
     
     def run(self, payload: dict, ai_caller=None) -> str:
         prompt = self._render_instruction(payload)
+        
+        # 注入语言指令
+        lang = payload.get("lang") or "zh"
+        lang_map = {
+            "zh": "\n\n【语言要求】\n请务必使用 **中文（简体）** 回复所有内容。",
+            "ja": "\n\n【言語要求】\nすべての回答内容を **日本語** で行ってください。",
+            "en": "\n\n[Language Requirement]\nYOU MUST RESPOND ENTIRELY IN **ENGLISH**.",
+            "ko": "\n\n[언어 요구 사항]\n모든 답변은 반드시 **한국어**로 작성하십시오.",
+        }
+        lang_rule = lang_map.get(lang, "")
+        if lang_rule:
+            prompt = prompt + lang_rule
+
         if ai_caller:
             try:
+                # 检查 AI Provider 是否支持执行模式（CLI）
+                if hasattr(ai_caller, 'execute_task'):
+                    return ai_caller.execute_task(prompt) or "⚠️ AI 无响应"
                 return ai_caller.call(prompt) or "⚠️ AI 无响应"
             except Exception as e:
                 return f"⚠️ 执行失败: {e}"

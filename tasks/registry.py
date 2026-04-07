@@ -212,25 +212,20 @@ def execute_task_logic(task: Dict[str, Any], lang: str = "zh", progress_cb=None)
         # 构建 prompt：包含原始指令和上下文
         prompt = body or subject
         if task_type and task_type not in ("email", "ai_job"):
-            # 如果指定了任务类型，告诉 AI 这是什么类型的任务
-            prompt = f"请执行以下{task_type}任务：{prompt}"
+            # 根据语言翻译前缀
+            type_prefix = {
+                "zh": f"请执行以下{task_type}任务：",
+                "ja": f"以下の{task_type}タスクを実行してください：",
+                "en": f"Please execute the following {task_type} task: ",
+                "ko": f"다음 {task_type} 작업을 수행하십시오: ",
+            }.get(lang, f"Please execute the following {task_type} task: ")
+            prompt = f"{type_prefix}{prompt}"
 
         # 注入技能列表（让 AI 知道可用工具）
         from skills import get_all_skills_prompt
         skills_hint = get_all_skills_prompt(lang)
         if skills_hint:
             prompt = f"{prompt}\n\n{skills_hint}"
-
-        # 显式指令 AI 使用检测到的语言回复
-        lang_map = {
-            "zh": "Please respond in Chinese (Simplified).",
-            "ja": "Please respond in Japanese.",
-            "en": "Please respond in English.",
-            "ko": "Please respond in Korean.",
-        }
-        lang_instruction = lang_map.get(lang, "")
-        if lang_instruction:
-            prompt = f"{lang_instruction}\n\n{prompt}"
 
         # 添加强制执行指令
         exec_instruction = {
@@ -241,6 +236,7 @@ def execute_task_logic(task: Dict[str, Any], lang: str = "zh", progress_cb=None)
 2. 如需写代码/文件，直接写入和执行
 3. 如需搜索/查询，直接调用相应技能
 4. 在最后给出简短总结
+5. **必须使用中文（简体）回复所有内容**
 """,
             "ja": """
 【重要実行指示】
@@ -249,6 +245,7 @@ def execute_task_logic(task: Dict[str, Any], lang: str = "zh", progress_cb=None)
 2. コード/ファイルが必要な場合は直接作成・実行
 3. 検索/問い合わせが必要な場合は該当スキルを直接呼び出し
 4. 最後に簡単なまとめを出力
+5. **すべての回答内容を日本語で行ってください**
 """,
             "en": """
 [IMPORTANT EXECUTION INSTRUCTION]
@@ -257,6 +254,7 @@ This is an auto-execution task. Please follow these rules:
 2. If code/files are needed, create and execute them directly
 3. If search/query is needed, call the relevant skill directly
 4. Output a brief summary at the end
+5. **YOU MUST RESPOND ENTIRELY IN ENGLISH**
 """,
             "ko": """
 [중요 실행 지침]
@@ -265,9 +263,14 @@ This is an auto-execution task. Please follow these rules:
 2. 코드/파일이 필요하면 직접 생성 및 실행
 3. 검색/조회가 필요하면 관련 스킬을 직접 호출
 4. 마지막에 간단한 요약 출력
+5. **모든 답변은 반드시 한국어로 작성하십시오**
 """,
         }
+        
+        # 将语言指令放在最后，具有最高优先级
         prompt = f"{prompt}\n\n{exec_instruction.get(lang, exec_instruction['zh'])}"
+
+        # 调用 AI（使用 execute_task 模式，而非普通 call）
 
         # 调用 AI（使用 execute_task 模式，而非普通 call）
         log.info(f"⚡ 定时任务调用 AI: {ai_name} | 类型：{task_type}")
