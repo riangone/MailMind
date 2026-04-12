@@ -429,7 +429,7 @@ do_status() {
     if [ -n "$wpid" ]; then
         local webui_host webui_port
         webui_host=$(grep -o 'WEBUI_HOST=[^ ]*' "$WEBUI_PID_FILE.meta" 2>/dev/null | cut -d= -f2 || echo "0.0.0.0")
-        webui_port=$(grep -o 'WEBUI_PORT=[^ ]*' "$WEBUI_PID_FILE.meta" 2>/dev/null | cut -d= -f2 || echo "8000")
+        webui_port=$(grep -o 'WEBUI_PORT=[^ ]*' "$WEBUI_PID_FILE.meta" 2>/dev/null | cut -d= -f2 || echo "7000")
         echo -e "  Web UI        ${GREEN}● 运行中${NC}  PID=$wpid  http://${webui_host}:${webui_port}"
     else
         echo -e "  Web UI        ${RED}○ 未运行${NC}"
@@ -708,12 +708,12 @@ do_webui() {
     [ -f "$ENV_FILE" ] && load_env
     local subcmd="${2:-start}"
     local host="${WEBUI_HOST:-0.0.0.0}"
-    local port="${WEBUI_PORT:-8000}"
+    local port="${WEBUI_PORT:-7000}"
 
     # 允许 bash manage.sh webui <host> <port> 直接传参（兼容旧用法）
     if [[ "${2}" =~ ^[0-9] ]] || [[ "${2}" == *"."* ]]; then
         host="${2:-0.0.0.0}"
-        port="${3:-8000}"
+        port="${3:-7000}"
         subcmd="start"
     fi
 
@@ -816,6 +816,63 @@ case "$1" in
     stop-all)       do_stop_all ;;
     restart-all)    do_restart_all ;;
     status-all)     do_status_all ;;
+    harness-status)
+        heading "Harness 集成状态检查"
+        load_env
+        if [ -z "$HARNESS_WEBUI_DIR" ]; then
+            warn "HARNESS_WEBUI_DIR 未配置"
+            echo ""
+            echo "  配置方法:"
+            echo "    在 .env 中添加:"
+            echo "    HARNESS_WEBUI_DIR=\"/home/ubuntu/ws/harness-new/webui\""
+            echo ""
+            echo "  配置后，可通过邮件指令调用 Harness 多 AI 管道："
+            echo "    邮件主题: pipeline"
+            echo "    邮件正文: 实现一个 TODO App，支持增删改查"
+        else
+            if [ -d "$HARNESS_WEBUI_DIR" ]; then
+                info "HARNESS_WEBUI_DIR: $HARNESS_WEBUI_DIR ✓"
+                if [ -f "$HARNESS_WEBUI_DIR/app/pipeline_executor.py" ]; then
+                    info "pipeline_executor.py: 存在 ✓"
+                else
+                    error "pipeline_executor.py: 未找到 ✗"
+                fi
+                if [ -f "$HARNESS_WEBUI_DIR/harness.db" ]; then
+                    info "harness.db: 存在 ✓"
+                else
+                    warn "harness.db: 未找到（首次运行时自动创建）"
+                fi
+                if [ -d "$HARNESS_WEBUI_DIR/venv" ]; then
+                    info "Harness venv: 存在 ✓"
+                else
+                    warn "Harness venv: 未找到（请检查 Harness 安装）"
+                fi
+                echo ""
+                # 测试导入
+                info "测试连通性..."
+                export HARNESS_WEBUI_DIR
+                "$VENV_PYTHON" -c "
+import os, sys
+sys.path.insert(0, '$INSTALL_DIR')
+os.environ['HARNESS_WEBUI_DIR'] = '$HARNESS_WEBUI_DIR'
+from integrations.harness_bridge import _find_harness_webui
+path = _find_harness_webui()
+if path:
+    print(f'  ✓ Harness 路径: {path}')
+    print('  ✓ 桥接模块正常')
+    print('')
+    print('  使用方式:')
+    print('    1. 发邮件，主题: pipeline')
+    print('    2. 正文: 你的任务描述')
+    print('    3. MailMind 调用 Harness 管道 → 邮件回复结果')
+else:
+    print('  ✗ 未找到 Harness 目录')
+" 2>&1
+            else
+                error "HARNESS_WEBUI_DIR 目录不存在: $HARNESS_WEBUI_DIR ✗"
+            fi
+        fi
+        ;;
     *)
         echo ""
         echo "用法: bash manage.sh <命令>"
@@ -830,7 +887,7 @@ case "$1" in
         echo "    log                   实时查看邮件守护进程日志"
         echo ""
         echo "  Web UI:"
-        echo "    webui [start]         后台启动 Web 管理界面（默认 0.0.0.0:8000）"
+        echo "    webui [start]         后台启动 Web 管理界面（默认 0.0.0.0:7000）"
         echo "    webui stop            停止 Web UI"
         echo "    webui restart         重启 Web UI"
         echo "    webui status          查看 Web UI 状态"
@@ -845,6 +902,9 @@ echo "    start-all             启动所有管理邮箱实例"
 echo "    stop-all              停止所有管理邮箱实例"
 echo "    restart-all           重启所有管理邮箱实例"
 echo "    status-all            查看所有管理邮箱实例状态"
+echo ""
+echo "  Harness 集成:"
+echo "    harness-status        检查 Harness 集成配置和连通性"
 echo ""
 echo "  其他:"
         echo "    push-templates        将指令模板写入邮箱文件夹（方便直接使用）"

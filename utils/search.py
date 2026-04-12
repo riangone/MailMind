@@ -38,9 +38,10 @@ def web_search(query: str, num_results: int = 5, engine: Optional[str] = None) -
                 for item in ddgs_client.text(query, max_results=num_results):
                     results.append({"title": item.get("title", ""), "snippet": item.get("body", ""), "url": item.get("href", "")})
         except ImportError:
-            log.warning("DuckDuckGo 搜索：未安装 ddgs，请运行 pip install ddgs")
+            # 优雅降级：不再显示警告，返回空结果让 AI 处理
+            log.debug("DuckDuckGo (ddgs) 未安装，跳过本地搜索。")
         except Exception as e:
-            log.warning(f"DuckDuckGo 搜索失败：{e}")
+            log.debug(f"DuckDuckGo 搜索失败：{e}")
 
     elif engine == "wikipedia":
         try:

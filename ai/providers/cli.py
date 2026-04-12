@@ -35,8 +35,10 @@ class CLIProvider(AIBase):
             env = self._build_env()
             cmd = [self.backend["cmd"]] + self.backend.get("args", []) + [prompt]
             cwd = WORKSPACE_DIR if WORKSPACE_DIR and os.path.isdir(WORKSPACE_DIR) else None
+            log.info(f"[CLI] 执行命令: {' '.join(cmd[:3])}... (timeout={timeout})")
             proc = subprocess.Popen(
                 cmd,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -58,6 +60,7 @@ class CLIProvider(AIBase):
                 _time.sleep(1)
                 elapsed = _time.time() - start
                 if timeout and elapsed > timeout:
+                    log.warning(f"[CLI] 超时，正在杀死进程 (timeout={timeout}s)")
                     proc.kill()
                     try:
                         proc.wait(timeout=5)
@@ -76,7 +79,11 @@ class CLIProvider(AIBase):
                     progress_cb(int(elapsed))
                     last_progress = _time.time()
 
-            t_out.join(); t_err.join()
-            return "".join(stdout_lines).strip() or f"Error: {''.join(stderr_lines[:5])}"
+            t_out.join(timeout=5); t_err.join(timeout=5)
+            stdout = "".join(stdout_lines).strip()
+            stderr = "".join(stderr_lines[:5])
+            result = stdout or f"Error: {stderr}"
+            log.info(f"[CLI] 命令执行完成，输出长度: {len(result)}")
+            return result
         except Exception as e:
             return f"AI 出错：{e}"

@@ -1,5 +1,25 @@
 import os
 import shutil
+
+# ─── .env 自動読み込み ───────────────────────────────────────────
+def _load_dotenv():
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    env_path = os.path.abspath(env_path)
+    if not os.path.isfile(env_path):
+        return
+    with open(env_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:  # 既存の環境変数は上書きしない
+                os.environ[key] = value
+
+_load_dotenv()
+
 # ═══════════════════════════════════════════════════════════════
 #  邮箱配置
 # ═══════════════════════════════════════════════════════════════
@@ -201,10 +221,10 @@ def _copilot_cmd() -> str:
 AI_BACKENDS = {
     # CLI 方式
     "claude":      {"type": "cli",           "cmd": _find_cli("claude", "CLAUDE_CMD"), "args": ["--print", "--dangerously-skip-permissions"],                           "native_web_search": True, "label": "Claude CLI",       "env_key": None},
-    "codex":       {"type": "cli",           "cmd": _find_cli("codex", "CODEX_CMD"),  "args": ["exec", "--skip-git-repo-check", "--full-auto"],                   "native_web_search": True, "label": "Codex CLI",        "env_key": None},
+    "codex":       {"type": "cli",           "cmd": _find_cli("codex", "CODEX_CMD"),  "args": ["exec", "--skip-git-repo-check"],                                                                 "native_web_search": False, "label": "OpenAI Codex CLI",   "env_key": None},
     "gemini":      {"type": "cli",           "cmd": _find_cli("gemini", "GEMINI_CMD"), "args": ["-y", "-p"],                                                               "native_web_search": True, "label": "Gemini CLI",       "env_key": None},
     "qwen":        {"type": "cli",           "cmd": _find_cli("qwen", "QWEN_CMD"),   "args": ["--prompt", "--web-search-default", "--yolo"],                               "native_web_search": True, "label": "Qwen CLI",         "env_key": None},
-    "copilot":     {"type": "cli",            "cmd": _copilot_cmd(),                  "args": [],                                                                          "native_web_search": True, "label": "GitHub Copilot",   "env_key": "GITHUB_COPILOT_TOKEN"},
+    "copilot":     {"type": "cli",            "cmd": _copilot_cmd(),                  "args": ["--yolo", "-p"],                                                              "native_web_search": True, "label": "GitHub Copilot",   "env_key": "GITHUB_COPILOT_TOKEN"},
     # API 方式 - 国际模型
     "anthropic":   {"type": "api_anthropic", "api_key": os.environ.get("ANTHROPIC_API_KEY", ""),  "model": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),                                                      "label": "Anthropic Claude",  "env_key": "ANTHROPIC_API_KEY"},
     "openai":      {"type": "api_openai",    "api_key": os.environ.get("OPENAI_API_KEY", ""),     "model": os.environ.get("OPENAI_MODEL",     "gpt-4o"),            "url": "https://api.openai.com/v1/chat/completions",          "label": "OpenAI (gpt-4o)",   "env_key": "OPENAI_API_KEY"},
@@ -253,6 +273,17 @@ AI_PROGRESS_INTERVAL = int(os.environ.get("AI_PROGRESS_INTERVAL", "120"))  # 进
 WORKSPACE_DIR = os.environ.get("WORKSPACE_DIR", "")
 if WORKSPACE_DIR:
     WORKSPACE_DIR = os.path.realpath(os.path.abspath(WORKSPACE_DIR))
+else:
+    # WORKSPACE_DIR 为空时，使用当前目录下的 ws 文件夹
+    _ws_dir = os.path.join(os.path.dirname(__file__), "..", "ws")
+    _ws_dir = os.path.realpath(os.path.abspath(_ws_dir))
+    if not os.path.isdir(_ws_dir):
+        try:
+            os.makedirs(_ws_dir, exist_ok=True)
+            print(f"[Config] 自动创建工作区目录: {_ws_dir}")
+        except Exception as e:
+            print(f"[Config] 创建工作区目录失败: {e}")
+    WORKSPACE_DIR = _ws_dir
 
 SHOW_FILE_CHANGES = os.environ.get("SHOW_FILE_CHANGES", "true").lower() == "true"
 # ────────────────────────────────────────────────────────────────
@@ -272,10 +303,10 @@ PROMPT_TEMPLATES = {
   "body": "回复正文",
   "schedule_at": "一次性定时：ISO格式或相对秒数，如 2026-03-17T09:00:00 或 3600",
   "schedule_every": "固定间隔重复：如 5m / 2h / 1d（与 schedule_cron 二选一）",
-  "schedule_cron": "按规律重复：cron 表达式，如每天9点→'0 9 * * *'，工作日9点→'0 9 * * 1-5'（与 schedule_every 二选一）",
+  "schedule_cron": "按规律重复：cron 表达式，如每天9点→'0 9 * * *'，工作日9点→'0 9 * * 1-5'，每天8点和16点→'0 8,16 * * *'（与 schedule_every 二选一）",
   "schedule_until": "重复任务截止时间（ISO格式），与 schedule_every/schedule_cron 配合",
   "attachments": [{{"filename": "a.txt", "content": "文本内容"}}],
-  "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<skill名>",
+  "task_type": "email|ai_job|weather|news|stock|web_search|report|system_status|email_manage|task_manage|<skill名>",
   "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread（email_manage）或 list|cancel|pause|resume|delete（task_manage）",
     "task_id": 3,
@@ -284,17 +315,24 @@ PROMPT_TEMPLATES = {
     "target_folder": "目标文件夹（email_manage action=move时必填）"}},
   "output": {{"email": true, "archive": true}}
 }}
+【强制指令 — 必须遵守】
+1. **禁止对话**：不要输出任何解释、问候、确认或询问。只输出 JSON。
+2. **禁止询问用户**：不要问"你想执行哪个任务？"或"请告诉我具体需求"。直接根据邮件内容生成 JSON。
+3. **立即执行**：如果邮件包含定时任务指令（如"每天8点和16点发送股市简报"），直接创建定时任务，不要询问确认。
+4. **只输出 JSON 对象**：以 `{` 开头，以 `}` 结尾，不要包含任何其他文字或代码块标记。
+
 规则：
 - schedule_at / schedule_every / schedule_cron 三选一，不可同时设置。
-- **仅定时任务**需要设置 task_type：每天/每周定时发送新闻→news，定时天气→weather，定时系统状态→system_status，定时综合报告→report。
+- **仅定时任务**需要设置 task_type：每天/每周定时发送新闻→news，定时天气→weather，定时股市/股票/股市简报→stock，定时系统状态→system_status，定时综合报告→report。
 - **即时回复（无定时）**：直接让 AI 回答问题时，使用 ai_job 或省略 task_type，AI 会直接生成回复正文。
 - 优先使用 AI skill 模式：task_type="ai_skill"，task_payload={{"skill": "weather|news|stock|web_search", "payload": {{...}}}}，AI 将自动调用外部工具或搜索能力。
-- task_payload 填写任务参数，例如 {{"query": "日本股市行情"}} 或 {{"location": "东京"}}。
+- task_payload 填写任务参数，例如 {{"query": "中国股市行情"}} 或 {{"location": "东京"}}。
 - 邮件整理/归类/移动/删除/标记已读 → email_manage，task_payload 必须包含 action 和 filter，action=move 时还需要 target_folder。
 - 查看/取消/暂停/恢复/删除定时任务 → task_manage，task_payload 包含 action（list/cancel/pause/resume/delete）和 task_id 或 filter。
 - 即时回复（无定时）时省略所有 schedule_* 字段。
 - 附件仅限文本内容。
 - 可使用已加载的技能作为 task_type（见下方技能列表）。
+- **多时间点任务**：如需每天8点和16点各发送一次，使用 cron 表达式 '0 8,16 * * *'，系统会在两个时间点各执行一次。
 邮件内容：
 {{instruction}}""",
     "ja": """\
@@ -304,10 +342,10 @@ PROMPT_TEMPLATES = {
   "body": "返信本文",
   "schedule_at": "一回限り：ISO形式または相対秒 例: 2026-03-17T09:00:00 または 3600",
   "schedule_every": "固定間隔繰り返し：例 5m/2h/1d（schedule_cronと二択）",
-  "schedule_cron": "規則的繰り返し：cron式 例 毎朝9時→'0 9 * * *' 平日9時→'0 9 * * 1-5'（schedule_everyと二択）",
+  "schedule_cron": "規則的繰り返し：cron式 例 毎朝9時→'0 9 * * *' 平日9時→'0 9 * * 1-5' 毎日8時と16時→'0 8,16 * * *'（schedule_everyと二択）",
   "schedule_until": "繰り返し終了時刻（ISO形式）、schedule_every/schedule_cronと併用",
   "attachments": [{{"filename": "a.txt", "content": "..."}}],
-  "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<スキル名>",
+  "task_type": "email|ai_job|weather|news|stock|web_search|report|system_status|email_manage|task_manage|<スキル名>",
   "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread（email_manage）または list|cancel|pause|resume|delete（task_manage）",
     "task_id": 3,
@@ -316,13 +354,20 @@ PROMPT_TEMPLATES = {
     "target_folder": "移動先フォルダ（email_manage action=moveの場合必須）"}},
   "output": {{"email": true, "archive": true}}
 }}
+【強制指示 — 厳守】
+1. **対話禁止**：説明、挨拶、確認、質問は一切不要。JSON のみ出力。
+2. **ユーザーへの質問禁止**：「どのタスクを実行しますか？」などの質問は禁止。メール内容から直接 JSON を生成。
+3. **即時実行**：メールに定期タスク指令（例「毎日8時と16時に株式ブリーフィングを送信」）が含まれる場合、確認せずに定期タスクを作成。
+4. **JSON オブジェクトのみ**：`{` で始まり `}` で終わる。他の文字やコードブロックマークアップは禁止。
+
 ルール：
 - schedule_at/schedule_every/schedule_cronは三択、同時設定不可。
-- スケジュール時はtask_typeを必須設定：ニュース/株→news、天気→weather、AI分析→ai_job、システム→system_status、総合レポート→report。
+- スケジュール時はtask_typeを必須設定：ニュース/株→news、天気→weather、股市/株式/股市ブリーフィング→stock、AI分析→ai_job、システム→system_status、総合レポート→report。
 - task_payloadに必要なパラメータを設定（例：{{"query":"日本株式市場"}}）。
 - メール整理/移動/削除/既読化 → email_manage、task_payloadにaction・filterを必須設定、action=moveはtarget_folderも必要。
 - 定期タスクの確認/取消/一時停止/再開/削除 → task_manage、action（list/cancel/pause/resume/delete）とtask_idまたはfilterを指定。
 - 即時返信の場合はschedule_*フィールドを省略。
+- 複数時間帯のタスク：毎日8時と16時に実行→cron式 '0 8,16 * * *' を使用。
 - ロードされたスキルをtask_typeとして使用可能（以下のスキル一覧参照）。
 {{instruction}}""",
     "en": """\
@@ -332,10 +377,10 @@ You are an email AI assistant. Read the email below and execute the task. Reply 
   "body": "Reply body",
   "schedule_at": "One-time: ISO format or relative seconds, e.g. 2026-03-17T09:00:00 or 3600",
   "schedule_every": "Fixed interval repeat: e.g. 5m/2h/1d (mutually exclusive with schedule_cron)",
-  "schedule_cron": "Pattern repeat: cron expression, e.g. daily 9am→'0 9 * * *', weekdays 9am→'0 9 * * 1-5' (mutually exclusive with schedule_every)",
+  "schedule_cron": "Pattern repeat: cron expression, e.g. daily 9am→'0 9 * * *', weekdays 9am→'0 9 * * 1-5', daily 8am and 4pm→'0 8,16 * * *' (mutually exclusive with schedule_every)",
   "schedule_until": "End time for repeating tasks (ISO format), used with schedule_every/schedule_cron",
   "attachments": [{{"filename": "a.txt", "content": "text content"}}],
-  "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<skill_name>",
+  "task_type": "email|ai_job|weather|news|stock|web_search|report|system_status|email_manage|task_manage|<skill_name>",
   "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread (email_manage) or list|cancel|pause|resume|delete (task_manage)",
     "task_id": 3,
@@ -344,15 +389,22 @@ You are an email AI assistant. Read the email below and execute the task. Reply 
     "target_folder": "destination folder (required when email_manage action=move)"}},
   "output": {{"email": true, "archive": true}}
 }}
+[MANDATORY INSTRUCTIONS — MUST OBEY]
+1. **NO DIALOGUE**: Do NOT output any explanations, greetings, confirmations, or questions. ONLY output JSON.
+2. **NO ASKING USER**: Do NOT ask "Which task do you want to execute?" or "Please tell me your requirements". Directly generate JSON from the email content.
+3. **IMMEDIATE EXECUTION**: If the email contains scheduled task instructions (e.g., "send a stock briefing at 8am and 4pm daily"), create the task WITHOUT asking for confirmation.
+4. **JSON OBJECT ONLY**: Must start with `{` and end with `}`. No other text or code block markers.
+
 Rules:
 - Use exactly one of schedule_at / schedule_every / schedule_cron, never multiple.
-- For SCHEDULED tasks ONLY: news→news, weather→weather, system_status→system_status, report→report.
+- For SCHEDULED tasks ONLY: news→news, weather→weather, stock/stock market briefing→stock, system_status→system_status, report→report.
 - For IMMEDIATE replies (no schedule): Use ai_job or omit task_type.
-- Set task_payload with required params, e.g. {{"query": "Japan stock market"}}.
+- Set task_payload with required params, e.g. {{"query": "China stock market"}}.
 - Email organization/sorting/moving/deleting/marking → email_manage; task_payload MUST include action and filter; action=move also requires target_folder.
 - View/cancel/pause/resume/delete scheduled tasks → task_manage; specify action (list/cancel/pause/resume/delete) plus task_id or filter.
 - For immediate replies, omit all schedule_* fields.
 - Attachments: text content only.
+- Multi-timepoint tasks: use cron like '0 8,16 * * *' for daily 8am and 4pm.
 - Loaded skills can be used as task_type (see skill list below).
 Email:
 {{instruction}}""",
@@ -363,10 +415,10 @@ Email:
   "body": "답장 본문",
   "schedule_at": "일회성 예약: ISO 형식 또는 상대 초, 예: 2026-03-17T09:00:00 또는 3600",
   "schedule_every": "고정 간격 반복: 예 5m/2h/1d（schedule_cron과 택일）",
-  "schedule_cron": "규칙적 반복: cron 표현식, 예 매일 9시→'0 9 * * *', 평일 9시→'0 9 * * 1-5'（schedule_every와 택일）",
+  "schedule_cron": "규칙적 반복: cron 표현식, 예 매일 9시→'0 9 * * *', 평일 9시→'0 9 * * 1-5', 매일 8시와 16시→'0 8,16 * * *'（schedule_every와 택일）",
   "schedule_until": "반복 작업 종료 시각（ISO 형식）, schedule_every/schedule_cron과 함께 사용",
   "attachments": [{{"filename": "a.txt", "content": "텍스트 내용"}}],
-  "task_type": "email|ai_job|weather|news|web_search|report|system_status|email_manage|task_manage|<스킬명>",
+  "task_type": "email|ai_job|weather|news|stock|web_search|report|system_status|email_manage|task_manage|<스킬명>",
   "task_payload": {{"query": "...", "location": "...", "prompt": "...", "skill": "weather|news|stock|web_search", "payload": {{"location": "Tokyo"}},
     "action": "move|delete|mark_read|mark_unread（email_manage）또는 list|cancel|pause|resume|delete（task_manage）",
     "task_id": 3,
@@ -375,13 +427,20 @@ Email:
     "target_folder": "대상 폴더（email_manage action=move 시 필수）"}},
   "output": {{"email": true, "archive": true}}
 }}
+[강제 지시 — 반드시 준수]
+1. **대화 금지**: 설명, 인사, 확인, 질문は一切 금지. JSON만 출력.
+2. **사용자 질문 금지**: "어떤 작업을 실행할까요?" 또는 "요구를 알려주세요" 등의 질문 금지. 이메일 내용에서 직접 JSON 생성.
+3. **즉시 실행**: 이메일에 예약 작업 지시(예 "매일 8시와 16시에 주식 브리핑 발송")가 있으면 확인 없이 예약 작업 생성.
+4. **JSON 객체만**: `{`로 시작하여 `}`로 종료. 다른 문자나 코드 블록 마크업 금지.
+
 규칙:
 - schedule_at / schedule_every / schedule_cron 중 하나만 사용, 동시 설정 불가.
-- 예약 작업 시 task_type 필수 설정: 뉴스/주식→news, 날씨→weather, AI 분석→ai_job, 시스템→system_status, 종합 보고서→report.
-- task_payload에 필요한 파라미터 설정（예: {{"query": "일본 주식 시장"}}）.
+- 예약 작업 시 task_type 필수 설정: 뉴스→news, 날씨→weather, 주식/주식 브리핑→stock, 시스템→system_status, 종합 보고서→report.
+- task_payload에 필요한 파라미터 설정（예: {{"query": "중국 주식 시장"}}）.
 - 이메일 정리/이동/삭제/읽음 표시 → email_manage, task_payload에 action과 filter 필수, action=move 시 target_folder도 필요.
 - 예약 작업 확인/취소/일시정지/재개/삭제 → task_manage, action（list/cancel/pause/resume/delete）과 task_id 또는 filter 지정.
 - 즉시 답장의 경우 schedule_* 필드 생략.
+- 다중 시간대 작업: 매일 8시와 16시 실행→cron 표현식 '0 8,16 * * *' 사용.
 - 첨부 파일은 텍스트 내용만 가능.
 - 로드된 스킬을 task_type으로 사용 가능（아래 스킬 목록 참조）.
 이메일:

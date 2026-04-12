@@ -129,6 +129,13 @@ def _init_default_tools():
     from skills.loader import get_skill
     shell_skill = get_skill("shell_exec")
     if shell_skill:
+        def _shell_exec_wrapper(args):
+            """包装 shell_exec 调用,添加参数验证"""
+            command = args.get("command", "").strip()
+            if not command:
+                return "⚠️ 错误: shell_exec 需要提供 command 参数。请在 task_payload 中指定要执行的命令。"
+            return shell_skill.run({"command": command, "cwd": args.get("cwd")})
+
         register_tool(Tool(
             name="shell_exec",
             description="在服务器上执行 shell 命令（受白名单限制）。返回命令输出和退出码。",
@@ -140,7 +147,7 @@ def _init_default_tools():
                 },
                 "required": ["command"]
             },
-            func=lambda args: shell_skill.run({"command": args.get("command"), "cwd": args.get("cwd")})
+            func=_shell_exec_wrapper
         ))
     
     # 2. web_search - 网页搜索
@@ -254,19 +261,31 @@ class TaskExecutor:
         self.tools = tools or list(_registered_tools.values())
         self.max_steps = max_steps
         self.tool_results: list[dict] = []
-    
+        
+        # 检查原生能力
+        self.native_web_search = False
+        if hasattr(ai_provider, "backend"):
+            self.native_web_search = ai_provider.backend.get("native_web_search", False)
+        
+        # 如果有原生搜索能力，移除内置的 web_search 工具以避免冲突
+        if self.native_web_search:
+            self.tools = [t for t in self.tools if t.name != "web_search"]
+            log.info(f"AI [{ai_provider.name}] 支持原生联网搜索，已禁用内置 web_search 工具")
+
     def execute(self, prompt: str, auto_execute: bool = True, progress_cb=None) -> str:
         """
         执行任务
-        
-        Args:
-            prompt: 任务描述
-            auto_execute: 是否自动执行工具（False 则只返回工具调用计划）
-            progress_cb: 进度回调函数
-        
-        Returns:
-            执行结果
         """
+        # 针对支持原生搜索的 AI，注入引导 Prompt
+        if self.native_web_search:
+            instruction = {
+                "zh": "\n💡 **注意**：你具有原生联网搜索/工具调用能力，请根据需要直接使用你的搜索工具。仅在无法通过原生能力完成时才考虑调用下方列出的其他工具。\n",
+                "en": "\n💡 **Note**: You have native web search and tool capabilities. Use your built-in tools when needed. Use the external tools listed below only if your native capabilities are insufficient.\n",
+                "ja": "\n💡 **注意**：あなたにはネイティブなウェブ検索/ツール実行能力があります。必要に応じて自身のツールを直接使用してください。外部ツールは補助的にのみ使用してください。\n"
+            }
+            lang = os.environ.get("PROMPT_LANG", "zh").lower()
+            prompt = instruction.get(lang, instruction["zh"]) + prompt
+
         if auto_execute:
             return self._execute_with_tools(prompt, progress_cb)
         else:

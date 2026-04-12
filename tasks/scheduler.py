@@ -328,6 +328,7 @@ class TaskScheduler:
 
     def _execute_single_task(self, t: dict):
         log.info(f"🔔 执行任务：[{t['subject']}] -> {t['to']}")
+        log.info(f"[Scheduler] _execute_single_task 被调用: task_id={t.get('id')}, type={t.get('type')}")
         lang = t.get("lang", "zh")
 
         # 進捗コールバック：CLI AI 実行中に AI_PROGRESS_INTERVAL 秒ごとに中間メール送信
@@ -362,6 +363,26 @@ class TaskScheduler:
             "body": t["body"],
         }
 
+        # 重要：实时重新加载 .env 中的 TASK_DEFAULT_AI，确保手动执行时使用最新配置
+        try:
+            env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+            env_path = os.path.abspath(env_path)
+            if os.path.isfile(env_path):
+                with open(env_path, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("TASK_DEFAULT_AI="):
+                            _, _, value = line.partition("=")
+                            value = value.strip().strip('"').strip("'")
+                            os.environ["TASK_DEFAULT_AI"] = value
+                            # 同时更新模块变量
+                            import core.config
+                            core.config.DEFAULT_TASK_AI = value
+                            log.info(f"[Scheduler] 已重新加载 TASK_DEFAULT_AI: {value!r}")
+                            break
+        except Exception as e:
+            log.warning(f"[Scheduler] 重新加载 .env 失败: {e}")
+
         subject, body = execute_task_logic(task_for_logic, lang=lang, progress_cb=_progress_cb)
 
         output = json.loads(t["output"])
@@ -378,16 +399,27 @@ class TaskScheduler:
                 log.warning(f"构建 List-Unsubscribe 头失败 (task {t['id']}): {e}")
 
         if output.get("email", True):
-            send_reply(
-                MAILBOXES[t["mailbox_name"]],
-                t["to"],
-                subject,
-                body,
-                in_reply_to=t.get("in_reply_to", ""),
-                attachments=attachments,
-                extra_headers=extra_headers if extra_headers else None,
-                lang=lang,
-            )
+            # 重要：如果收件人为空，使用管理邮箱地址作为默认收件人
+            recipient = t["to"]
+            if not recipient or not recipient.strip():
+                mailbox = MAILBOXES.get(t["mailbox_name"], {})
+                recipient = mailbox.get("address", "")
+                if not recipient:
+                    log.warning(f"任务 {t.get('id')} 没有收件人，跳过邮件发送")
+                else:
+                    log.info(f"任务 {t.get('id')} 收件人为空，使用管理邮箱地址: {recipient}")
+
+            if recipient:
+                send_reply(
+                    MAILBOXES[t["mailbox_name"]],
+                    recipient,
+                    subject,
+                    body,
+                    in_reply_to=t.get("in_reply_to", ""),
+                    attachments=attachments,
+                    extra_headers=extra_headers if extra_headers else None,
+                    lang=lang,
+                )
 
         if output.get("archive", False):
             archive_output(output, subject, body, attachments)

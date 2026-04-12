@@ -2699,8 +2699,9 @@ async def stream_ai_cli(backend: str, prompt: str, cancel_event: asyncio.Event, 
         raise ValueError(f"Unknown CLI backend: {backend}")
     
     cmd = cli_commands[backend]
-    
+
     # Some CLIs read from stdin, others take prompt as argument
+    # codex takes prompt as argument, others use stdin
     if backend in ("claude", "gemini", "qwen", "copilot"):
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -2974,8 +2975,9 @@ async def run_ai_cli(backend: str, prompt: str, timeout: int = 120) -> str:
         raise ValueError(f"Unknown CLI backend: {backend}")
     
     cmd = cli_commands[backend]
-    
+
     # Some CLIs read from stdin, others take prompt as argument
+    # codex takes prompt as argument, others use stdin
     if backend in ("claude", "gemini", "qwen", "copilot"):
         # Pass prompt via stdin
         proc = await asyncio.create_subprocess_exec(

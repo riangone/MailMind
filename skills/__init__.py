@@ -61,6 +61,11 @@ class MDSkill(BaseSkill):
         self.instruction = instruction
     
     def run(self, payload: dict, ai_caller=None) -> str:
+        # 验证必填参数
+        is_valid, error_msg = self.validate_payload(payload)
+        if not is_valid:
+            return f"⚠️ 参数验证失败: {error_msg}"
+
         prompt = self._render_instruction(payload)
         
         # 注入语言指令

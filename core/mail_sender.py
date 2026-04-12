@@ -21,8 +21,11 @@ from core.validator import validate_path, is_path_in_workspace
 from utils.logger import log
 
 def smtp_login(mailbox: dict):
-    server = smtplib.SMTP_SSL(mailbox["smtp_server"], mailbox["smtp_port"]) if mailbox.get("smtp_ssl") else smtplib.SMTP(mailbox["smtp_server"], mailbox["smtp_port"])
-    if not mailbox.get("smtp_ssl"):
+    port = mailbox["smtp_port"]
+    use_starttls = mailbox.get("smtp_starttls") or port == 587
+    use_ssl = mailbox.get("smtp_ssl") and not use_starttls
+    server = smtplib.SMTP_SSL(mailbox["smtp_server"], port) if use_ssl else smtplib.SMTP(mailbox["smtp_server"], port)
+    if not use_ssl:
         server.ehlo()
         server.starttls()
     auth = mailbox.get("auth", "password")
@@ -42,6 +45,11 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
                        for RFC 8058 one-click unsubscribe support).
         lang: Language for the footer (zh/ja/ko/en).
     """
+    # Validate recipient address
+    if not to or not to.strip():
+        log.error("❌ send_reply 失败：收件人地址为空")
+        return ""
+    
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     footer_texts = {
@@ -104,7 +112,11 @@ def send_reply(mailbox: dict, to: str, subject: str, body: str, in_reply_to: str
         msg.attach(part)
         
     with smtp_login(mailbox) as s:
-        s.sendmail(mailbox["address"], to, msg.as_string())
+        try:
+            s.sendmail(mailbox["address"], to, msg.as_string())
+        except smtplib.SMTPException as e:
+            log.error(f"❌ SMTP 发送失败 -> {to} | {subject}: {e}")
+            raise
     log.info(f"✅ 已回复 -> {to} | {subject}")
     return msg_id
 

@@ -304,7 +304,8 @@ email_daemon.py
 ├── utils.search     → web_search(), format_search_results()
 ├── utils.mcp_client → MCP 客户端（filesystem/github/sqlite）
 ├── tasks.scheduler  → TaskScheduler (SQLite, 支持 cron)
-└── tasks.registry   → execute_task_logic()
+├── tasks.registry   → execute_task_logic()
+└── integrations.harness_bridge → run_harness_pipeline() (可选，多 AI 管道协作)
 ```
 
 ### 数据流
@@ -379,6 +380,69 @@ fetch_unread_emails() → process_email() → call_ai() → send_reply()
 MCP_SERVERS=filesystem,github
 MCP_SERVER_FILESYSTEM=npx -y @modelcontextprotocol/server-filesystem /home/user/reports
 MCP_SERVER_GITHUB=npx -y @modelcontextprotocol/server-github
+```
+
+### Harness 多 AI 管道集成（可选）
+
+MailMind 可与 [Multi-AI Harness](https://github.com/yourname/harness-new) 集成，利用其多角色协作管道（planner → generator → evaluator）提升复杂任务的处理质量。
+
+**适用场景**：
+- 复杂代码生成（需要规划 + 实现 + 评估反馈循环）
+- 大型项目开发（需要多 AI 角色分工）
+- 高质量要求任务（Evaluator 自动审查，失败自动重试修正）
+
+**配置**（`.env`）：
+```bash
+HARNESS_WEBUI_DIR="/home/ubuntu/ws/harness-new/webui"  # Harness webui 目录路径
+HARNESS_VENV_PYTHON=""                                   # Harness 虚拟环境 Python（可选）
+```
+
+**使用方式**：
+
+1. **即时指令**（邮件主题写 `pipeline`）：
+```
+主题: pipeline
+正文: 实现一个 TODO App，支持增删改查，使用纯前端 HTML/CSS/JS
+```
+
+2. **定时任务**（AI 返回 JSON 中包含 task_type: pipeline）：
+```json
+{
+  "task_type": "pipeline",
+  "task_payload": {
+    "prompt": "实现一个 REST API 服务器，支持用户认证和 CRUD 操作",
+    "mode": "full",
+    "work_dir": "/home/user/projects/my-api",
+    "timeout": 600
+  }
+}
+```
+
+**管道模式说明**：
+- `mode: "full"`（默认）: 完整的 planner → generator → evaluator 流水线，最多重试 3 轮
+- `mode: "single"`: 单 AI 直接执行（适合简单任务）
+
+**管理命令**：
+```bash
+bash manage.sh harness-status  # 检查 Harness 集成配置和连通性
+```
+
+**工作原理**：
+```
+用户发邮件 → MailMind 接收 → 识别 pipeline 类型
+    ↓
+调用 Harness pipeline_executor.py
+    ↓
+Phase 1: [Planner AI] 生成实现计划 (plan.md)
+    ↓
+Phase 2: [Generator AI] 根据计划生成代码
+    ↓
+Phase 3: [Evaluator AI] 评估代码质量 (eval-report.md)
+    ↓
+VERDICT: PASS → 完成 ✓
+VERDICT: FAIL → 返回 Phase 2 修正（最多 3 轮）
+    ↓
+结果邮件回复用户（含完整日志和产出文件）
 ```
 
 ### 附件支持

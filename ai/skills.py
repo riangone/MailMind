@@ -52,7 +52,7 @@ Skill List:
 技能列表：
 - **weather**: 天气查询与播报（支持 MCP/WeatherAPI/网络搜索）
 - **news**: 新闻搜索与摘要（支持 NewsAPI/网页搜索/AI 原生搜索）
-- **stock**: 查询股票/加密货币行情及分析（支持网页搜索/AI 原生搜索）
+- **stock**: 股市简报/股票查询与行情分析（支持网页搜索/AI 原生搜索）
 - **web_search**: 网页搜索（支持 MCP/本地搜索引擎）
 - **news_briefing**: 生成统一格式的 Markdown 新闻简报
 """
