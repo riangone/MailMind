@@ -268,8 +268,30 @@ class TaskScheduler:
             cur = conn.execute(sql, params)
             return cur.rowcount
 
+    def _cleanup_stale_processing(self, timeout_seconds: int = 1800):
+        """清理启动时卡死的 processing 任务（超过 timeout_seconds 秒的视为失败）"""
+        import time
+        cutoff = time.time() - timeout_seconds
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                "SELECT id, type, subject FROM tasks WHERE status = 'processing' AND updated_at < ?",
+                (cutoff,)
+            )
+            stale_tasks = cursor.fetchall()
+            if stale_tasks:
+                log.warning(f"🧹 发现 {len(stale_tasks)} 个卡死的 processing 任务，重置为 failed")
+                for task in stale_tasks:
+                    log.warning(f"   - 任务 #{task[0]}: type={task[1]}, subject={task[2]}")
+                conn.execute(
+                    "UPDATE tasks SET status = 'failed', error = '任务执行超时（进程重启后清理）' WHERE status = 'processing' AND updated_at < ?",
+                    (cutoff,)
+                )
+                conn.commit()
+
     def run_forever(self, shutdown_event=None):
         log.info("⏰ 任务调度器已启动 (SQLite)")
+        # 启动时清理卡死的 processing 任务（超过 30 分钟未完成的视为失败）
+        self._cleanup_stale_processing()
         while True:
             if shutdown_event and shutdown_event.is_set():
                 log.info("⏰ 任务调度器收到退出信号，正在停止...")

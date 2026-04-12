@@ -271,6 +271,7 @@ def execute_task_logic(task: Dict[str, Any], lang: str = "zh", progress_cb=None)
             else:
                 body = f"❌ Pipeline 执行失败:\n\n{result['output']}"
                 subject = subject or f"❌ Pipeline Failed: {harness_prompt[:30]}"
+        return subject, body
 
     # 6. 其他所有任务：使用增强版 AI 执行框架
     else:

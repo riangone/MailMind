@@ -78,11 +78,11 @@ def trim_email_body(body: str, max_chars: int = 4000) -> str:
 def parse_ai_response(raw: str) -> Tuple:
     """
     解析 AI 的 JSON 响应
-    
+
     返回：(subject, body, schedule_at, schedule_every, schedule_until, schedule_cron, attachments, task_type, task_payload, output)
     """
     json_str = None
-    
+
     # 尝试从代码块中提取 JSON
     outer = re.search(r'```(?:json)?\s*(\{[\s\S]*\})\s*`*', raw)
     if outer:
@@ -92,10 +92,11 @@ def parse_ai_response(raw: str) -> Tuple:
         m = re.search(r'\{[\s\S]*\}', raw)
         if m:
             json_str = m.group()
-    
+
     if json_str:
         try:
             data = json.loads(json_str)
+            log.info(f"✅ AI 响应解析成功: task_type={data.get('task_type')!r}, schedule_at={data.get('schedule_at')!r}, schedule_every={data.get('schedule_every')!r}, schedule_cron={data.get('schedule_cron')!r}, skill={data.get('task_payload', {}).get('skill')!r}")
             return (
                 data.get("subject", ""),
                 data.get("body") or "",
@@ -109,8 +110,12 @@ def parse_ai_response(raw: str) -> Tuple:
                 data.get("output"),
             )
         except json.JSONDecodeError as e:
-            log.warning(f"AI 响应 JSON 解析失败：{e}")
-    
+            log.error(f"❌ AI 响应 JSON 解析失败: {e}")
+            log.error(f"   原始响应预览 (前500字): {raw[:500]}")
+            log.error(f"   尝试提取的 JSON 片段 (前500字): {json_str[:500]}")
+
     # 没有 JSON，直接返回原文作为 body
+    log.warning(f"⚠️ AI 响应中未找到有效 JSON，将作为普通文本回复")
+    log.warning(f"   原始响应预览 (前300字): {raw[:300]}")
     cleaned = re.sub(r'```(?:json)?', '', raw).strip()
     return "", cleaned, None, None, None, None, [], None, None, None

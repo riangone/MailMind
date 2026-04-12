@@ -282,6 +282,12 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
     scheduler.record_stat(mailbox_name, "success", _ai_ms, em.get("subject"))
     sub, body, sch_at, sch_every, sch_until, sch_cron, atts, task_type, task_payload, output = ai_result
 
+    # 详细记录 AI 解析结果，方便排查问题
+    log.info(f"📋 AI 解析结果: task_type={task_type!r}, subject={sub!r}, body_len={len(body) if body else 0}")
+    log.info(f"   schedule_at={sch_at!r}, schedule_every={sch_every!r}, schedule_cron={sch_cron!r}")
+    log.info(f"   task_payload keys={list(task_payload.keys()) if task_payload else None}")
+    log.info(f"   output={output!r}")
+
     # email_manage 确认回复检测（先经 AI，再执行）
     if em.get("in_reply_to"):
         from core.email_manager import get_pending_op, pop_pending_op, execute_email_manage_op
@@ -413,6 +419,21 @@ def _process_email_impl(mailbox_name, ai_name, backend, em):
         log.info(f"⚡ 立即执行工具任务: {task_type}")
         t_sub, t_body = execute_task_logic({
             "type": task_type,
+            "payload": task_payload or {},
+            "subject": sub,
+            "body": body
+        }, lang=lang, progress_cb=_progress_cb if is_cli else None)
+        out_conf = output or {"email": True}
+        if out_conf.get("email", True):
+            send_reply(MAILBOXES[mailbox_name], em["from_email"], t_sub, t_body, em.get("message_id"), atts, lang=lang)
+        if out_conf.get("archive", False):
+            archive_output(out_conf, t_sub, t_body, atts)
+    elif (task_type == "ai_job" or not task_type) and (task_payload or {}).get("skill"):
+        # 修复：即时任务包含 skill 参数时，也应执行技能
+        skill_name = (task_payload or {}).get("skill", "")
+        log.info(f"⚡ 立即执行技能任务 (ai_job + skill): {skill_name}")
+        t_sub, t_body = execute_task_logic({
+            "type": "ai_skill",
             "payload": task_payload or {},
             "subject": sub,
             "body": body
