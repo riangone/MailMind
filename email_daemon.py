@@ -163,8 +163,16 @@ def call_ai(ai_name: str, backend: dict, instruction: str, lang: str = None, pro
             raw = ai.call(prompt, progress_cb=progress_cb, timeout=AI_CLI_TIMEOUT, progress_interval=AI_PROGRESS_INTERVAL)
         else:
             raw = ai.call(prompt)
+
+    # 记录 AI 原始响应（调试用）
+    if isinstance(raw, str):
+        log.info(f"🤖 AI 原始响应 (前300字): {raw[:300]}")
+        if len(raw) > 300:
+            log.info(f"🤖 AI 原始响应 (总长度): {len(raw)} 字符")
+
     # AI error prefix indicates a failure — return sentinel rather than parse garbage
     if isinstance(raw, str) and raw.startswith("AI 出错："):
+        log.error(f"❌ AI 调用返回错误前缀: {raw[:200]}")
         return None
     return parse_ai_response(raw)
 
