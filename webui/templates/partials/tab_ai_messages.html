@@ -1,0 +1,290 @@
+{# AI 消息流瀑布流页面 #}
+{% if feedback %}
+<div class="feedback {{ 'ok' if feedback.ok else 'err' }}">{{ feedback.message }}</div>
+{% endif %}
+
+<div class="ai-messages-page">
+  <!-- 顶部统计卡片 -->
+  <div class="ai-messages-stats">
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">{{ t.ai_messages_total }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color: var(--green);">
+        {% if stats.total > 0 %}{{ (stats.success_count / stats.total * 100) | round(1) }}%{% else %}-%{% endif %}
+      </div>
+      <div class="stat-label">{{ t.ai_messages_success_rate }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ stats.avg_ai_call_ms | round(0) }}ms</div>
+      <div class="stat-label">{{ t.ai_messages_avg_call_ms }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" style="color: var(--red);">{{ stats.fail_count }}</div>
+      <div class="stat-label">失败</div>
+    </div>
+  </div>
+
+  <!-- 过滤器栏 -->
+  <div class="ai-messages-filters">
+    <form id="ai-msg-filter-form" class="filter-row" hx-get="/tabs/ai-messages" hx-target="#content" hx-swap="innerHTML" hx-push-url="true">
+      <select name="from_email" class="filter-select" id="filter-email">
+        <option value="">{{ t.ai_messages_filter_email }}</option>
+        {% for email in unique_emails %}
+        <option value="{{ email }}" {{ 'selected' if current_email == email }}>{% if email %}{{ email[:30] }}...{% endif %}</option>
+        {% endfor %}
+      </select>
+
+      <select name="task_type" class="filter-select" id="filter-type">
+        <option value="">{{ t.ai_messages_filter_type }}</option>
+        {% for tt in ["ai_job","weather","news","stock","web_search","report","system_status","email_manage","task_manage","pipeline","summarize","translate","news_briefing","code_review","code_executor","shell_exec","calendar_skill","github","invoice","ticket"] %}
+        <option value="{{ tt }}" {{ 'selected' if current_type == tt }}>{{ tt }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="ai_name" class="filter-select" id="filter-ai">
+        <option value="">{{ t.ai_messages_filter_ai }}</option>
+        {% for ai in unique_ai_names %}
+        <option value="{{ ai }}" {{ 'selected' if current_ai == ai }}>{{ ai }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="parse_success" class="filter-select" id="filter-status">
+        <option value="">{{ t.ai_messages_filter_status }}</option>
+        <option value="true" {{ 'selected' if current_status == 'true' }}>✅ 成功</option>
+        <option value="false" {{ 'selected' if current_status == 'false' }}>❌ 失败</option>
+      </select>
+
+      <input type="text" name="keyword" class="filter-input" placeholder="{{ t.ai_messages_search }}" value="{{ current_keyword }}">
+
+      <input type="hidden" name="limit" value="{{ current_limit }}">
+      <input type="hidden" name="offset" value="0">
+
+      <button type="submit" class="btn-filter">{{ t.ai_messages_btn_filter }}</button>
+      <button type="button" class="btn-reset" onclick="window.location.href='/tabs/ai-messages'">{{ t.ai_messages_btn_reset }}</button>
+    </form>
+  </div>
+
+  <!-- 按 AI 分布和任务类型分布 -->
+  <div class="ai-messages-distributions">
+    <div class="dist-card">
+      <h4>{{ t.ai_messages_stats_by_ai }}</h4>
+      <div class="dist-bars">
+        {% for item in stats.by_ai %}
+        <div class="dist-bar">
+          <span class="dist-label">{{ item.ai_name }}</span>
+          <div class="dist-bar-track">
+            <div class="dist-bar-fill" style="width: {{ (item.count / stats.total * 100) | round(0) }}%;"></div>
+          </div>
+          <span class="dist-count">{{ item.count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="dist-card">
+      <h4>{{ t.ai_messages_stats_by_type }}</h4>
+      <div class="dist-bars">
+        {% for item in stats.by_type %}
+        <div class="dist-bar">
+          <span class="dist-label">{{ item.task_type or '(none)' }}</span>
+          <div class="dist-bar-track">
+            <div class="dist-bar-fill" style="width: {{ (item.count / stats.total * 100) | round(0) }}%;"></div>
+          </div>
+          <span class="dist-count">{{ item.count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- 瀑布流消息卡片 -->
+  {% if messages %}
+  <div class="ai-messages-masonry" id="ai-messages-container">
+    {% for msg in messages %}
+    <div class="ai-msg-card" data-msg-id="{{ msg.id }}">
+      <!-- 卡片头部 -->
+      <div class="ai-msg-header">
+        <span class="ai-msg-time">{{ msg.datetime }}</span>
+        <span class="ai-msg-badge ai-msg-{{ 'ok' if msg.parse_success else 'err' }}">
+          {{ '✅' if msg.parse_success else '❌' }}
+        </span>
+        {% if msg.task_type %}
+        <span class="ai-msg-badge ai-msg-type">{{ msg.task_type }}</span>
+        {% endif %}
+        <span class="ai-msg-badge ai-msg-ai">{{ msg.ai_name }}</span>
+        {% if msg.ai_call_ms > 0 %}
+        <span class="ai-msg-time">{{ msg.ai_call_ms }}ms</span>
+        {% endif %}
+      </div>
+
+      <!-- 邮件上下文 -->
+      <div class="ai-msg-context">
+        {% if msg.from_email %}
+        <div class="ai-msg-field">
+          <span class="ai-msg-field-label">📧</span>
+          <span class="ai-msg-field-value" title="{{ msg.from_email }}">{{ msg.from_email[:40] }}...</span>
+        </div>
+        {% endif %}
+        {% if msg.email_subject %}
+        <div class="ai-msg-field">
+          <span class="ai-msg-field-label">📬</span>
+          <span class="ai-msg-field-value">{{ msg.email_subject[:60] }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- 解析结果摘要 -->
+      {% if msg.parse_success and msg.body_preview %}
+      <div class="ai-msg-body-preview">
+        <details>
+          <summary>{{ t.ai_messages_task_result }}</summary>
+          <pre class="ai-msg-pre">{{ msg.body_preview[:300] }}{% if msg.body_length > 300 %}...{% endif %}</pre>
+        </details>
+      </div>
+      {% endif %}
+
+      <!-- 解析错误 -->
+      {% if not msg.parse_success and msg.parse_error %}
+      <div class="ai-msg-error">
+        <strong>❌ {{ msg.parse_error[:100] }}</strong>
+      </div>
+      {% endif %}
+
+      <!-- 调度信息 -->
+      {% if msg.schedule_cron or msg.schedule_every or msg.schedule_at %}
+      <div class="ai-msg-schedule">
+        ⏰ {% if msg.schedule_cron %}cron: {{ msg.schedule_cron }}{% elif msg.schedule_every %}every: {{ msg.schedule_every }}{% elif msg.schedule_at %}at: {{ msg.schedule_at }}{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- 操作按钮 -->
+      <div class="ai-msg-actions">
+        <button class="btn-sm" onclick="showAiMsgDetail({{ msg.id }})">{{ t.ai_messages_show_detail }}</button>
+        <button class="btn-sm" onclick="copyAiMsgRaw({{ msg.id }})">{{ t.ai_messages_copy_raw }}</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- 加载更多 -->
+  {% if messages | length >= current_limit %}
+  <div class="ai-messages-load-more">
+    <button class="btn-load-more"
+            hx-get="/tabs/ai-messages?limit={{ current_limit }}&offset={{ current_offset + current_limit }}&from_email={{ current_email }}&task_type={{ current_type }}&ai_name={{ current_ai }}&parse_success={{ current_status }}&keyword={{ current_keyword }}"
+            hx-target="#ai-messages-container"
+            hx-swap="beforeend"
+            hx-select="#ai-messages-container > *"
+            hx-indicator="this">
+      {{ t.ai_messages_load_more }}
+    </button>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="ai-messages-empty">
+    <p>{{ t.ai_messages_empty }}</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- 详情模态框 -->
+<div id="ai-msg-detail-modal" class="ai-msg-modal" style="display:none;" onclick="closeAiMsgModal(event)">
+  <div class="ai-msg-modal-content" onclick="event.stopPropagation()">
+    <button class="ai-msg-modal-close" onclick="document.getElementById('ai-msg-detail-modal').style.display='none'">×</button>
+    <div id="ai-msg-modal-body">加载中...</div>
+  </div>
+</div>
+
+<script>
+function showAiMsgDetail(id) {
+  const modal = document.getElementById('ai-msg-detail-modal');
+  const body = document.getElementById('ai-msg-modal-body');
+  modal.style.display = 'flex';
+  body.innerHTML = '加载中...';
+
+  fetch(`/api/ai-messages/${id}`)
+    .then(r => r.json())
+    .then(data => {
+      body.innerHTML = `
+        <div class="ai-msg-detail-header">
+          <span class="ai-msg-detail-time">${data.datetime}</span>
+          <span class="ai-msg-badge ${data.parse_success ? 'ai-msg-ok' : 'ai-msg-err'}">${data.parse_success ? '✅' : '❌'}</span>
+          ${data.task_type ? `<span class="ai-msg-badge">${data.task_type}</span>` : ''}
+          <span class="ai-msg-badge">${data.ai_name}</span>
+          ${data.ai_call_ms ? `<span>${data.ai_call_ms}ms</span>` : ''}
+        </div>
+        <div class="ai-msg-detail-grid">
+          <div class="ai-msg-detail-field">
+            <strong>发件人:</strong> ${data.from_email || '-'}
+          </div>
+          <div class="ai-msg-detail-field">
+            <strong>邮件主题:</strong> ${data.email_subject || '-'}
+          </div>
+          ${data.subject ? `<div class="ai-msg-detail-field"><strong>AI 主题:</strong> ${data.subject}</div>` : ''}
+          ${data.schedule_cron ? `<div class="ai-msg-detail-field"><strong>Cron:</strong> ${data.schedule_cron}</div>` : ''}
+          ${data.schedule_every ? `<div class="ai-msg-detail-field"><strong>Every:</strong> ${data.schedule_every}</div>` : ''}
+        </div>
+        ${data.task_payload_json ? `
+        <details open>
+          <summary><strong>Task Payload</strong></summary>
+          <pre class="ai-msg-json">${formatJson(data.task_payload_json)}</pre>
+        </details>` : ''}
+        <details>
+          <summary><strong>{{ t.ai_messages_prompt }} (${data.prompt_length || 0} 字符)</strong></summary>
+          <pre class="ai-msg-pre">${escapeHtml(data.prompt_preview || '')}</pre>
+        </details>
+        <details open>
+          <summary><strong>{{ t.ai_messages_raw_response }} (${data.raw_response_length || 0} 字符)</strong></summary>
+          <pre class="ai-msg-pre">${escapeHtml(data.raw_response || '')}</pre>
+        </details>
+        ${data.body_preview ? `
+        <details>
+          <summary><strong>{{ t.ai_messages_task_result }} (${data.body_length || 0} 字符)</strong></summary>
+          <pre class="ai-msg-pre">${escapeHtml(data.body_preview)}</pre>
+        </details>` : ''}
+        ${data.parse_error ? `<div class="ai-msg-error"><strong>错误:</strong> ${escapeHtml(data.parse_error)}</div>` : ''}
+      `;
+    })
+    .catch(err => { body.innerHTML = `<p style="color:red">加载失败: ${err}</p>`; });
+}
+
+function closeAiMsgModal(event) {
+  if (event.target.id === 'ai-msg-detail-modal') {
+    event.target.style.display = 'none';
+  }
+}
+
+function copyAiMsgRaw(id) {
+  fetch(`/api/ai-messages/${id}`)
+    .then(r => r.json())
+    .then(data => {
+      navigator.clipboard.writeText(data.raw_response || '').then(() => {
+        showToast('{{ t.ai_messages_copied }}');
+      });
+    });
+}
+
+function formatJson(str) {
+  try { return JSON.stringify(JSON.parse(str), null, 2); } catch { return str; }
+}
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
+
+// ESC 关闭模态框
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('ai-msg-detail-modal').style.display = 'none';
+  }
+});
+</script>
