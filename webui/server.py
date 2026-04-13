@@ -1408,7 +1408,7 @@ async def set_lang(request: Request, code: str):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: str = ""):
-    return templates.TemplateResponse("login.html", _ctx(request, error=error))
+    return templates.TemplateResponse(request, "login.html", _ctx(request, error=error))
 
 
 @app.post("/login", response_class=HTMLResponse)
@@ -1419,7 +1419,7 @@ async def login_submit(request: Request, password: str = Form("")):
         return RedirectResponse(url="/", status_code=303)
     lang = get_ui_lang(request)
     error_msg = I18N.get(lang, I18N["zh"]).get("login_error", "Error")
-    return templates.TemplateResponse("login.html", _ctx(request, error=error_msg))
+    return templates.TemplateResponse(request, "login.html", _ctx(request, error=error_msg))
 
 
 @app.get("/logout")
@@ -1452,7 +1452,7 @@ async def health():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, _auth=Depends(require_auth)):
     env = read_env()
-    return templates.TemplateResponse("index.html", _ctx(
+    return templates.TemplateResponse(request, "index.html", _ctx(
         request, env=env, status=get_status(),
         ai_backends=AI_BACKENDS, mail_config=get_mail_config(env),
     ))
@@ -1460,7 +1460,7 @@ async def index(request: Request, _auth=Depends(require_auth)):
 
 @app.get("/partials/header_status", response_class=HTMLResponse)
 async def header_status(request: Request, _auth=Depends(require_auth)):
-    return templates.TemplateResponse("partials/header_status.html", _ctx(
+    return templates.TemplateResponse(request, "partials/header_status.html", _ctx(
         request, status=get_status(), message=None, success=True,
     ))
 
@@ -1468,7 +1468,7 @@ async def header_status(request: Request, _auth=Depends(require_auth)):
 @app.get("/tabs/mail", response_class=HTMLResponse)
 async def tab_mail(request: Request, _auth=Depends(require_auth)):
     env = read_env()
-    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
         request, env=env, mail_config=get_mail_config(env), feedback=None,
     ))
 
@@ -1476,7 +1476,7 @@ async def tab_mail(request: Request, _auth=Depends(require_auth)):
 @app.get("/tabs/ai", response_class=HTMLResponse)
 async def tab_ai(request: Request, _auth=Depends(require_auth)):
     env = read_env()
-    return templates.TemplateResponse("partials/tab_ai.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_ai.html", _ctx(
         request, env=env, ai_backends=AI_BACKENDS, feedback=None,
     ))
 
@@ -1484,7 +1484,7 @@ async def tab_ai(request: Request, _auth=Depends(require_auth)):
 @app.get("/tabs/tasks", response_class=HTMLResponse)
 async def tab_tasks(request: Request, _auth=Depends(require_auth), status: str = "all"):
     from utils.cache import query_cache
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(status_filter=status), status_filter=status,
         feedback=None, cache_stats=query_cache.stats(),
     ))
@@ -1500,7 +1500,7 @@ async def task_trigger(request: Request, task_id: int, _auth=Depends(require_aut
         feedback = {"ok": False, "message": str(e)}
     except Exception as e:
         feedback = {"ok": False, "message": f"Error: {e}"}
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(), status_filter="all", feedback=feedback,
     ))
 
@@ -1513,7 +1513,7 @@ async def task_delete(request: Request, task_id: int, _auth=Depends(require_auth
         feedback = {"ok": True, "message": f"Task #{task_id} deleted"}
     except Exception as e:
         feedback = {"ok": False, "message": f"Error: {e}"}
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(), status_filter="all", feedback=feedback,
     ))
 
@@ -1529,7 +1529,7 @@ async def task_pause(request: Request, task_id: int, _auth=Depends(require_auth)
         feedback = {"ok": True, "message": f"Task #{task_id} paused"}
     except Exception as e:
         feedback = {"ok": False, "message": f"Error: {e}"}
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(), status_filter="all", feedback=feedback,
     ))
 
@@ -1542,7 +1542,7 @@ async def task_resume(request: Request, task_id: int, _auth=Depends(require_auth
         feedback = {"ok": True, "message": f"Task #{task_id} resumed"}
     except Exception as e:
         feedback = {"ok": False, "message": f"Error: {e}"}
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(), status_filter="all", feedback=feedback,
     ))
 
@@ -1555,7 +1555,7 @@ async def task_restart(request: Request, task_id: int, _auth=Depends(require_aut
         feedback = {"ok": True, "message": f"Task #{task_id} restarted"}
     except Exception as e:
         feedback = {"ok": False, "message": f"Error: {e}"}
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(), status_filter="all", feedback=feedback,
     ))
 
@@ -1581,7 +1581,7 @@ async def task_new_form(request: Request, _auth=Depends(require_auth)):
         ("recurring", t.get("tasks_schedule_recurring", "Recurring")),
         ("cron", t.get("tasks_schedule_cron", "Cron")),
     ]
-    return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks_new.html", _ctx(
         request, task_types=task_types, schedule_modes=schedule_modes,
         feedback=None, task=None,
     ))
@@ -1605,7 +1605,7 @@ async def task_create(request: Request, _auth=Depends(require_auth)):
     
     if not subject:
         feedback = {"ok": False, "message": "Task subject is required"}
-        return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+        return templates.TemplateResponse(request, "partials/tab_tasks_new.html", _ctx(
             request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
         ))
     
@@ -1616,7 +1616,7 @@ async def task_create(request: Request, _auth=Depends(require_auth)):
             task_payload = json.loads(task_payload_str)
         except json.JSONDecodeError as e:
             feedback = {"ok": False, "message": f"Invalid JSON payload: {e}"}
-            return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+            return templates.TemplateResponse(request, "partials/tab_tasks_new.html", _ctx(
                 request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
             ))
     
@@ -1638,7 +1638,7 @@ async def task_create(request: Request, _auth=Depends(require_auth)):
             task_data["trigger_time"] = schedule_time
         except Exception as e:
             feedback = {"ok": False, "message": f"Invalid schedule time: {e}"}
-            return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+            return templates.TemplateResponse(request, "partials/tab_tasks_new.html", _ctx(
                 request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
             ))
     elif schedule_mode == "recurring" and schedule_every:
@@ -1658,7 +1658,7 @@ async def task_create(request: Request, _auth=Depends(require_auth)):
                 interval_seconds = int(s)
         except Exception:
             feedback = {"ok": False, "message": "Invalid interval format (e.g., 5m, 2h, 1d)"}
-            return templates.TemplateResponse("partials/tab_tasks_new.html", _ctx(
+            return templates.TemplateResponse(request, "partials/tab_tasks_new.html", _ctx(
                 request, task_types=[], schedule_modes=[], feedback=feedback, task=None,
             ))
         task_data["interval_seconds"] = interval_seconds
@@ -1691,7 +1691,7 @@ async def task_create(request: Request, _auth=Depends(require_auth)):
     except Exception as e:
         feedback = {"ok": False, "message": f"Database error: {e}"}
     
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(), status_filter="all", feedback=feedback,
     ))
 
@@ -1732,7 +1732,7 @@ async def task_edit_form(request: Request, task_id: int, _auth=Depends(require_a
             ("cron", t.get("tasks_schedule_cron", "Cron")),
         ]
         
-        return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+        return templates.TemplateResponse(request, "partials/tab_tasks_edit.html", _ctx(
             request, task=task, task_types=task_types, schedule_modes=schedule_modes,
             feedback=None,
         ))
@@ -1758,7 +1758,7 @@ async def task_update(request: Request, task_id: int, _auth=Depends(require_auth
     
     if not subject:
         feedback = {"ok": False, "message": "Task subject is required"}
-        return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+        return templates.TemplateResponse(request, "partials/tab_tasks_edit.html", _ctx(
             request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
         ))
     
@@ -1769,7 +1769,7 @@ async def task_update(request: Request, task_id: int, _auth=Depends(require_auth
             task_payload = json.loads(task_payload_str)
         except json.JSONDecodeError as e:
             feedback = {"ok": False, "message": f"Invalid JSON payload: {e}"}
-            return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+            return templates.TemplateResponse(request, "partials/tab_tasks_edit.html", _ctx(
                 request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
             ))
     
@@ -1791,7 +1791,7 @@ async def task_update(request: Request, task_id: int, _auth=Depends(require_auth
             updates["cron_expr"] = None
         except Exception as e:
             feedback = {"ok": False, "message": f"Invalid schedule time: {e}"}
-            return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+            return templates.TemplateResponse(request, "partials/tab_tasks_edit.html", _ctx(
                 request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
             ))
     elif schedule_mode == "recurring" and schedule_every:
@@ -1810,7 +1810,7 @@ async def task_update(request: Request, task_id: int, _auth=Depends(require_auth
                 interval_seconds = int(s)
         except Exception:
             feedback = {"ok": False, "message": "Invalid interval format (e.g., 5m, 2h, 1d)"}
-            return templates.TemplateResponse("partials/tab_tasks_edit.html", _ctx(
+            return templates.TemplateResponse(request, "partials/tab_tasks_edit.html", _ctx(
                 request, task=None, task_types=[], schedule_modes=[], feedback=feedback,
             ))
         updates["interval_seconds"] = interval_seconds
@@ -1851,7 +1851,7 @@ async def task_update(request: Request, task_id: int, _auth=Depends(require_auth
     except Exception as e:
         feedback = {"ok": False, "message": f"Database error: {e}"}
     
-    return templates.TemplateResponse("partials/tab_tasks.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_tasks.html", _ctx(
         request, tasks=get_tasks(), status_filter="all", feedback=feedback,
     ))
 
@@ -1861,7 +1861,7 @@ async def tab_skills(request: Request, _auth=Depends(require_auth)):
     from skills.loader import get_registry
     skills = list(get_registry().values())
     examples = _build_skill_examples()
-    return templates.TemplateResponse("partials/tab_skills.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_skills.html", _ctx(
         request, skills=skills, feedback=None, skill_examples=examples,
     ))
 
@@ -1946,7 +1946,7 @@ async def api_skills_reload(request: Request, _auth=Depends(require_auth)):
     t = I18N.get(lang, I18N["zh"])
     examples = _build_skill_examples()
     feedback = {"ok": True, "message": f"{t['skills_count_prefix']}{len(skills)}{t['skills_count_suffix']}"}
-    return templates.TemplateResponse("partials/tab_skills.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_skills.html", _ctx(
         request, skills=skills, feedback=feedback, skill_examples=examples,
     ))
 
@@ -1994,7 +1994,7 @@ async def api_skill_test(request: Request, skill_name: str, _auth=Depends(requir
 
 @app.get("/tabs/stats", response_class=HTMLResponse)
 async def tab_stats(request: Request, _auth=Depends(require_auth)):
-    return templates.TemplateResponse("partials/tab_stats.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_stats.html", _ctx(
         request, stats=get_mail_stats(),
     ))
 
@@ -2020,7 +2020,7 @@ async def tab_logs(request: Request, _auth=Depends(require_auth)):
         for line in reversed(recent):  # 新→旧の順でDOM上部から並べる（最新が最上部）
             html_lines.append(f'<div class="{_classify(line)}">{html.escape(line)}</div>')
 
-    return templates.TemplateResponse("partials/tab_logs.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_logs.html", _ctx(
         request, initial_log_html="".join(html_lines)
     ))
 
@@ -2050,7 +2050,7 @@ async def autoconfig(request: Request, _auth=Depends(require_auth)):
 
         prefix = MAILBOX_PREFIX.get(mailbox_type, "MAIL_CUSTOM")
 
-    return templates.TemplateResponse("partials/autoconfig_result.html", _ctx(
+    return templates.TemplateResponse(request, "partials/autoconfig_result.html", _ctx(
         request, domain=domain, mailbox_type=mailbox_type,
         ac_result=ac_result, prefix=prefix, env=env, email=email_address,
     ))
@@ -2108,7 +2108,7 @@ async def config_mail(request: Request, _auth=Depends(require_auth)):
         feedback = {"ok": False, "message": t["fb_save_failed"] + str(e)}
 
     env = read_env()
-    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
         request, env=env, mail_config=get_mail_config(env), feedback=feedback,
     ))
 
@@ -2151,7 +2151,7 @@ async def config_ai(request: Request, _auth=Depends(require_auth)):
         feedback = {"ok": False, "message": t["fb_save_failed"] + str(e)}
 
     env = read_env()
-    return templates.TemplateResponse("partials/tab_ai.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_ai.html", _ctx(
         request, env=env, ai_backends=AI_BACKENDS, feedback=feedback,
     ))
 
@@ -2159,7 +2159,7 @@ async def config_ai(request: Request, _auth=Depends(require_auth)):
 @app.post("/daemon/{action}", response_class=HTMLResponse)
 async def daemon_action(request: Request, action: str, _auth=Depends(require_auth)):
     if action not in ("start", "stop", "restart"):
-        return templates.TemplateResponse("partials/header_status.html", _ctx(
+        return templates.TemplateResponse(request, "partials/header_status.html", _ctx(
             request, status=get_status(), message=f"Unknown action: {action}", success=False,
         ))
 
@@ -2191,7 +2191,7 @@ async def daemon_action(request: Request, action: str, _auth=Depends(require_aut
     await asyncio.sleep(0.8)
     status = get_status()
 
-    return templates.TemplateResponse("partials/header_status.html", _ctx(
+    return templates.TemplateResponse(request, "partials/header_status.html", _ctx(
         request, status=status, message=message, success=success,
     ))
 
@@ -2278,7 +2278,7 @@ def get_all_instances() -> list[dict]:
 async def tab_instances(request: Request, _auth=Depends(require_auth)):
     """Show multi-instance management page."""
     instances = get_all_instances()
-    return templates.TemplateResponse("partials/tab_instances.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_instances.html", _ctx(
         request, instances=instances, feedback=None,
     ))
 
@@ -2317,7 +2317,7 @@ async def tab_ai_messages(
     unique_emails = list(set(m[1] for m in [(r["from_email"],) for r in all_msgs] if m[0]))[:20]
     unique_ai_names = list(set(r["ai_name"] for r in all_msgs if r["ai_name"]))
 
-    return templates.TemplateResponse("partials/tab_ai_messages.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_ai_messages.html", _ctx(
         request,
         messages=messages,
         stats=stats,
@@ -2339,7 +2339,7 @@ async def tab_ai_messages(
 async def instance_action(request: Request, suffix: str, action: str, _auth=Depends(require_auth)):
     """Start/stop/restart an instance."""
     if action not in ("start", "stop", "restart"):
-        return templates.TemplateResponse("partials/tab_instances.html", _ctx(
+        return templates.TemplateResponse(request, "partials/tab_instances.html", _ctx(
             request, instances=get_all_instances(), 
             feedback={"ok": False, "message": f"Unknown action: {action}"},
         ))
@@ -2390,7 +2390,7 @@ async def instance_action(request: Request, suffix: str, action: str, _auth=Depe
     else:
         feedback = {"ok": False, "message": t["instance_action_failed"] + message}
     
-    return templates.TemplateResponse("partials/tab_instances.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_instances.html", _ctx(
         request, instances=get_all_instances(), feedback=feedback,
     ))
 
@@ -2422,7 +2422,7 @@ async def mail_push_templates(request: Request, _auth=Depends(require_auth)):
         success = False
     
     env = read_env()
-    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
         request, env=env, mail_config=get_mail_config(env),
         feedback={"ok": success, "message": message},
     ))
@@ -2431,7 +2431,7 @@ async def mail_push_templates(request: Request, _auth=Depends(require_auth)):
 @app.post("/mail/push-templates-to", response_class=HTMLResponse)
 async def mail_push_templates_to_form(request: Request, _auth=Depends(require_auth)):
     """Show form to push templates to a specific email."""
-    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
         request, env=read_env(), mail_config=get_mail_config(read_env()),
         feedback=None, show_push_to_form=True,
     ))
@@ -2445,7 +2445,7 @@ async def mail_push_templates_to_submit(request: Request, _auth=Depends(require_
     
     if not target_email or "@" not in target_email:
         feedback = {"ok": False, "message": "请输入有效的邮箱地址"}
-        return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+        return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
             request, env=read_env(), mail_config=get_mail_config(read_env()),
             feedback=feedback,
         ))
@@ -2472,7 +2472,7 @@ async def mail_push_templates_to_submit(request: Request, _auth=Depends(require_
         success = False
     
     env = read_env()
-    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
         request, env=env, mail_config=get_mail_config(env),
         feedback={"ok": success, "message": message},
     ))
@@ -2505,7 +2505,7 @@ async def systemd_install(request: Request, _auth=Depends(require_auth)):
         success = False
     
     env = read_env()
-    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
         request, env=env, mail_config=get_mail_config(env),
         feedback={"ok": success, "message": message},
     ))
@@ -2536,7 +2536,7 @@ async def systemd_uninstall(request: Request, _auth=Depends(require_auth)):
         success = False
     
     env = read_env()
-    return templates.TemplateResponse("partials/tab_mail.html", _ctx(
+    return templates.TemplateResponse(request, "partials/tab_mail.html", _ctx(
         request, env=env, mail_config=get_mail_config(env),
         feedback={"ok": success, "message": message},
     ))
@@ -3033,6 +3033,7 @@ async def chat_get_messages(request: Request, session_id: int):
     require_auth(request)
     messages = get_chat_messages(session_id)
     return templates.TemplateResponse(
+        request,
         "partials/chat_messages.html",
         {**_ctx(request), "messages": messages}
     )
@@ -3044,6 +3045,7 @@ async def chat_get_sessions(request: Request):
     require_auth(request)
     sessions = get_chat_sessions()
     return templates.TemplateResponse(
+        request,
         "partials/chat_sessions.html",
         {**_ctx(request), "sessions": sessions, "active_session": int(request.query_params.get("active", 0))}
     )
@@ -3161,6 +3163,7 @@ Assistant:"""
     # Return updated messages
     messages = get_chat_messages(session_id)
     return templates.TemplateResponse(
+        request,
         "partials/chat_messages.html",
         {**_ctx(request), "messages": messages}
     )

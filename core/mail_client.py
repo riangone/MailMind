@@ -53,6 +53,20 @@ def get_body_and_attachments(msg) -> tuple:
             body = payload.decode(msg.get_content_charset() or "utf-8", errors="replace").strip()
     return body, attachments
 
+def is_sender_allowed(sender: str, allowed: list) -> bool:
+    """Check if sender is in the allowed list. Empty list means allow all."""
+    if not allowed:
+        return True
+    sender = sender.lower()
+    for entry in allowed:
+        entry = entry.lower()
+        if entry.startswith("@"):
+            if sender.endswith(entry):
+                return True
+        elif sender == entry:
+            return True
+    return False
+
 def imap_login(mailbox: dict):
     # Increase default timeout to 60s for slow SSL handshakes/connections
     timeout = mailbox.get("timeout", 60)
